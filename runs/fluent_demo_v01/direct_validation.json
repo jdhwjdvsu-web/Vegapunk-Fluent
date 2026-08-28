@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "method": "Windows direct PyFluent, one session, baseline case reloaded before each point",
+  "case_file": "C:\\path\\to\\mixing_elbow.cas.h5",
+  "iterations_per_point": 100,
+  "results": [
+    {
+      "cold_inlet_velocity_m_per_s": 0.55,
+      "outlet_temperature_K": 295.0364218442149,
+      "mass_flow_in_kg_per_s": 0.002968969254809296,
+      "mass_flow_out_kg_per_s": 0.002968970821264707,
+      "mass_balance_relative_error": 5.276077330556444e-7,
+      "elapsed_seconds": 19.3051
+    },
+    {
+      "cold_inlet_velocity_m_per_s": 0.85,
+      "outlet_temperature_K": 294.5068931674979,
+      "mass_flow_in_kg_per_s": 0.004399092401667472,
+      "mass_flow_out_kg_per_s": 0.00439909220816757,
+      "mass_balance_relative_error": 4.399762866701626e-8,
+      "elapsed_seconds": 27.7146
+    }
+  ],
+  "conclusion": "The objective changes with the parameter and each point starts from the same baseline case."
+}

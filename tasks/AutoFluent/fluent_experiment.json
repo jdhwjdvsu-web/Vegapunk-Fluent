@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "task_name": "AutoFluent",
+  "connection": {
+    "endpoint": "http://127.0.0.1:18000/mcp",
+    "client_timeout_seconds": 300,
+    "connect_kwargs": {
+      "ui_mode": "no_gui",
+      "precision": "double",
+      "processor_count": 2,
+      "dimension": 3,
+      "case_file_name": "${FLUENT_CASE_FILE}",
+      "start_timeout": 180,
+      "cleanup_on_exit": true
+    }
+  },
+  "solver": {
+    "initialization": "hybrid",
+    "iterations": 100,
+    "residual_thresholds": {
+      "continuity": 0.001,
+      "x-velocity": 0.001,
+      "y-velocity": 0.001,
+      "z-velocity": 0.001,
+      "energy": 1e-06
+    }
+  },
+  "parameters": [
+    {
+      "name": "cold_inlet_velocity",
+      "collection_path": "setup.boundary_conditions.velocity_inlet",
+      "object_name": "cold-inlet",
+      "property_path": "momentum.velocity_magnitude.value",
+      "unit": "m/s",
+      "minimum": 0.1,
+      "maximum": 2.0
+    }
+  ],
+  "reports": [
+    {
+      "name": "outlet-temp-avg",
+      "kind": "surface",
+      "report_type": "surface-areaavg",
+      "field": "temperature",
+      "locations": ["outlet"]
+    }
+  ],
+  "design_points": [
+    {"name": "candidate-1", "values": {"cold_inlet_velocity": 0.55}},
+    {"name": "candidate-2", "values": {"cold_inlet_velocity": 0.85}}
+  ],
+  "objective": {"report": "outlet-temp-avg", "direction": "minimize"},
+  "constraints": [
+    {"report": "outlet-temp-avg", "operator": "<=", "value": 310.0}
+  ]
+}

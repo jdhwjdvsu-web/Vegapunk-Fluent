@@ -1,0 +1,22 @@
+{
+  "event": "parameter_rejected_preflight",
+  "timestamp": "2026-08-27T10:36:54.047690+00:00",
+  "parameters": {
+    "cold_inlet_velocity": 2.1
+  },
+  "gate": {
+    "passed": false,
+    "checks": [
+      {
+        "name": "cold_inlet_velocity",
+        "passed": false,
+        "value": 2.1
+      }
+    ],
+    "reasons": [
+      "parameters.cold_inlet_velocity=2.1 exceeds maximum 1.1"
+    ],
+    "metrics": {}
+  },
+  "mcp_called": false
+}

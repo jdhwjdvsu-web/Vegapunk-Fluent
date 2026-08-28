@@ -1,0 +1,19 @@
+{
+  "AutoFluent": {
+    "means": {
+      "objective_score": -1000.0,
+      "successful_design_point_rate": 0.0,
+      "valid_design_point_rate": 0.0,
+      "constraint_pass_rate": 0.0,
+      "convergence_score": 0.0
+    },
+    "best_design_point": null,
+    "objective": {
+      "report": "outlet-temp-avg",
+      "direction": "minimize",
+      "value": null,
+      "score": -1000.0,
+      "unit": null
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "task_name": "AutoFluent",
+  "domain": "computational fluid dynamics",
+  "description": "Use a constrained JSON design-point specification to run Ansys Fluent through the official PyFluent-MCP service.",
+  "goal": "Improve the configured Fluent report objective by proposing parameter values within the declared engineering bounds.",
+  "dataset": "An Ansys Fluent case supplied through the FLUENT_CASE_FILE environment variable.",
+  "baseline": "The design points in fluent_experiment.json.",
+  "metrics": {
+    "primary": "objective_score",
+    "secondary": ["successful_design_point_rate", "valid_design_point_rate", "constraint_pass_rate", "convergence_score"],
+    "optimization_direction": "maximize"
+  },
+  "constraints": [
+    "Only edit design_points values in fluent_experiment.json unless a human explicitly expands the allowlist.",
+    "Every value must remain within its parameter minimum and maximum.",
+    "Do not insert Python, Fluent TUI commands, file paths, endpoints, or arbitrary code into the experiment file.",
+    "A design point is valid only when all report constraints and configured residual thresholds pass.",
+    "Use one Fluent solve at a time under the Student license."
+  ],
+  "fix_direction": "Explore bounded design-point values while preserving the declared parameter paths, reports, constraints, and solver safety settings."
+}
