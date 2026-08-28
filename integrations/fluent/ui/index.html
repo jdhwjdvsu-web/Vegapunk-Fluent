@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Vegapunk Fluent 参数优化控制台" />
+    <title>Fluent Lab · Vegapunk</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Fluent Lab 首页">
+        <span class="brand-mark">V</span>
+        <span>
+          <strong>Fluent Lab</strong>
+          <small>Vegapunk · 参数优化</small>
+        </span>
+      </a>
+      <div class="connection" aria-live="polite">
+        <span id="mcp-dot" class="status-dot muted"></span>
+        <span id="mcp-label">正在检测 Fluent MCP</span>
+        <span id="control-mode" class="mode-badge">—</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="panel controls" aria-labelledby="control-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">实验设置</p>
+            <h1 id="control-title">运行参数</h1>
+          </div>
+          <span id="job-badge" class="job-badge idle">待命</span>
+        </div>
+
+        <form id="run-form" novalidate>
+          <label class="field field-wide">
+            <span>Fluent case 文件</span>
+            <input
+              id="case-file"
+              name="case_file"
+              type="text"
+              placeholder="C:\cases\mixing_elbow.cas.h5"
+              autocomplete="off"
+              required
+            />
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>目标试验数</span>
+              <input id="target-trials" name="target_trials" type="number" min="1" max="100" required />
+            </label>
+            <label class="field">
+              <span>每次迭代步数</span>
+              <input id="iterations" name="iterations" type="number" min="1" max="1000000" required />
+            </label>
+          </div>
+
+          <fieldset>
+            <legend>冷入口速度范围 <small>m/s</small></legend>
+            <div class="field-row">
+              <label class="field">
+                <span>最小值</span>
+                <input id="velocity-min" name="velocity_min" type="number" min="0.001" step="0.01" required />
+              </label>
+              <label class="field">
+                <span>最大值</span>
+                <input id="velocity-max" name="velocity_max" type="number" min="0.001" step="0.01" required />
+              </label>
+            </div>
+          </fieldset>
+
+          <details>
+            <summary>连接设置</summary>
+            <label class="field field-wide detail-field">
+              <span>MCP 地址</span>
+              <input id="endpoint" name="endpoint" type="url" required />
+            </label>
+          </details>
+
+          <p id="form-note" class="form-note">运行时会复用同一 Fluent 会话，并将结果持续写入当前实验目录。</p>
+          <div id="form-error" class="form-error" role="alert"></div>
+          <button id="run-button" class="primary-button" type="submit">
+            <span id="run-button-label">开始优化</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </form>
+      </aside>
+
+      <section class="results" aria-labelledby="result-title">
+        <div class="result-header">
+          <div>
+            <p class="eyebrow">实时结果</p>
+            <h2 id="result-title">优化概览</h2>
+          </div>
+          <p id="updated-at" class="updated-at">等待数据</p>
+        </div>
+
+        <section class="metrics" aria-label="关键指标">
+          <article class="metric">
+            <span>完成进度</span>
+            <strong><span id="completed-value">0</span><small id="target-value"> / 0</small></strong>
+            <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+          </article>
+          <article class="metric">
+            <span>最佳出口温度</span>
+            <strong><span id="best-temperature">—</span><small> K</small></strong>
+            <p>当前最小目标值</p>
+          </article>
+          <article class="metric">
+            <span>对应入口速度</span>
+            <strong><span id="best-velocity">—</span><small> m/s</small></strong>
+            <p id="best-trial">尚无有效试验</p>
+          </article>
+        </section>
+
+        <section class="chart-card" aria-labelledby="chart-title">
+          <div class="section-title">
+            <div>
+              <h3 id="chart-title">速度与出口温度</h3>
+              <p>每个点代表一次通过质量守恒检查的计算</p>
+            </div>
+            <span id="trial-count">0 个数据点</span>
+          </div>
+          <div id="chart" class="chart" role="img" aria-label="冷入口速度与出口平均温度散点图">
+            <div class="empty-state">完成一次试验后，这里会显示结果曲线</div>
+          </div>
+        </section>
+
+        <section class="table-card" aria-labelledby="table-title">
+          <div class="section-title">
+            <div>
+              <h3 id="table-title">试验记录</h3>
+              <p>最近结果优先显示</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>试验</th>
+                  <th>入口速度</th>
+                  <th>出口温度</th>
+                  <th>耗时</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody id="trial-table">
+                <tr><td colspan="5" class="table-empty">暂无试验记录</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>

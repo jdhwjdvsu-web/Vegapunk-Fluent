@@ -151,6 +151,36 @@ four TPE trials. All passed the finite-number and 0.1% mass-conservation gates. 
 also demonstrated a normal restart after trial 2. See
 `runs/fluent_demo_v01/demo_summary.json` for the exact values.
 
+## 5. Open the Fluent Lab web UI
+
+Fluent Lab is a focused, responsive control page for the walking skeleton. It keeps
+the editable case path, trial count, solver iterations and inlet-velocity bounds in
+one compact form, then shows progress, the best point, a velocity/temperature chart
+and recent trial records.
+
+Start it from WSL. The launcher resolves the current Windows gateway for MCP and
+binds the UI to all local interfaces:
+
+```bash
+cd /mnt/d/Vegapunk-Fluent
+export FLUENT_CASE_FILE='C:\path\to\mixing_elbow.cas.h5'
+bash integrations/fluent/wsl/run_fluent_ui.sh
+```
+
+Open `http://127.0.0.1:8780` on the same computer. A Windows-only launch also works:
+
+```powershell
+$env:FLUENT_CASE_FILE = 'C:\path\to\mixing_elbow.cas.h5'
+python -m vegapunk.fluent.web --host 0.0.0.0 --port 8780
+```
+
+The loopback page may submit runs. LAN and Tailscale views are read-only by default,
+so opening a dashboard link on another device cannot start Fluent accidentally.
+Only use `--allow-remote-control` behind a trusted authenticated network boundary.
+There is intentionally no cancel button: interrupting a submitted solver call can
+leave Fluent state uncertain, and the controller requires an explicit restart in
+that situation.
+
 ## v0.1 limitations and deferred work
 
 - Serial execution only; there is no Fluent worker pool or parallel study.
