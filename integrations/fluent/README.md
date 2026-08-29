@@ -151,12 +151,19 @@ four TPE trials. All passed the finite-number and 0.1% mass-conservation gates. 
 also demonstrated a normal restart after trial 2. See
 `runs/fluent_demo_v01/demo_summary.json` for the exact values.
 
-## 5. Open the Fluent Lab web UI
+## 5. Open the AI Scientist Simulation Workbench
 
-Fluent Lab is a focused, responsive control page for the walking skeleton. It keeps
-the editable case path, trial count, solver iterations and inlet-velocity bounds in
-one compact form, then shows progress, the best point, a velocity/temperature chart
-and recent trial records.
+The responsive browser UI is organized as a scientific task workbench instead of a
+traditional Fluent parameter panel. The left rail follows the research workflow
+(model and data, experiment plan, experiment monitor, results and artifacts), the
+center pane shows the selected stage, the right pane provides a bounded planning
+assistant, and the bottom strip keeps Fluent, Runner, Gate and Trial state visible.
+
+The default monitor view highlights progress, the best objective, objective history,
+parameter space and auditable Trial records. Advanced settings keep the case path,
+MCP endpoint, trial budget, solver iterations and parameter bounds available without
+making them the primary interface. Agent-generated plans always stop at a human
+approval gate before a local run is submitted.
 
 Start it from WSL. The launcher resolves the current Windows gateway for MCP and
 binds the UI to all local interfaces:

@@ -65,7 +65,7 @@ def test_state_api_reads_saved_results_and_allows_enabled_control(tmp_path):
     assert payload["summary"]["best_value"] == 300.25
     assert payload["trials"] == [trial]
     assert page.status_code == 200
-    assert "Fluent Lab" in page.text
+    assert "Vegapunk-Fluent" in page.text
 
 
 def test_remote_client_gets_read_only_state(tmp_path):
