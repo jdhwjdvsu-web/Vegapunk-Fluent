@@ -62,3 +62,10 @@ def test_optuna_study_resumes_and_preserves_startup_then_tpe(tmp_path):
     assert events.count("parameter_rejected_preflight") == 1
     assert events.count("trial_completed") == 4
     assert (tmp_path / "study.sqlite3").exists()
+    assert (tmp_path / "campaign.json").exists()
+    optimization_summary = json.loads(
+        (tmp_path / "optimization_summary.json").read_text(encoding="utf-8")
+    )
+    assert optimization_summary["completed"] == 4
+    assert optimization_summary["campaign_fingerprint"]
+    assert (tmp_path / "final_info.json").exists()

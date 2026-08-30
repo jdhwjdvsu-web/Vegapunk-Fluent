@@ -55,20 +55,45 @@ def build_design_point_code(spec: ExperimentSpec, point: DesignPointSpec) -> str
         lines.append("solver.settings.solution.initialization.hybrid_initialize()")
     elif spec.solver.initialization == "standard":
         lines.append("solver.settings.solution.initialization.standard_initialize()")
-    lines.append(
-        "solver.settings.solution.run_calculation.iterate"
-        f"(iter_count={spec.solver.iterations})"
-    )
+    monitored_reports = []
+    if spec.optimization is not None:
+        monitored_reports = sorted(
+            {monitor.report for monitor in spec.optimization.numerical_monitors}
+        )
+    if monitored_reports:
+        monitor_count = max(
+            monitor.window for monitor in spec.optimization.numerical_monitors
+        )
+        base, remainder = divmod(spec.solver.iterations, monitor_count)
+        chunks = [base + (1 if index < remainder else 0) for index in range(monitor_count)]
+        lines.append("__vp_monitor_history_raw = []")
+        lines.append(f"for __vp_chunk_size in {chunks!r}:")
+        lines.append(
+            "    solver.settings.solution.run_calculation.iterate"
+            "(iter_count=__vp_chunk_size)"
+        )
+        lines.append(
+            "    __vp_monitor_history_raw.append("
+            "solver.settings.solution.report_definitions.compute"
+            f"(report_defs={monitored_reports!r}))"
+        )
+    else:
+        lines.append(
+            "solver.settings.solution.run_calculation.iterate"
+            f"(iter_count={spec.solver.iterations})"
+        )
     report_names = [report.name for report in spec.reports]
     lines.append(
         "__vp_computed = solver.settings.solution.report_definitions.compute"
         f"(report_defs={report_names!r})"
     )
+    monitor_expression = "__vp_monitor_history_raw" if monitored_reports else "[]"
     lines.append(
         "__vp_payload = {"
         "'name': __vp_point_name, 'parameters': __vp_applied, "
         "'iterations_requested': "
-        f"{spec.solver.iterations}, 'computed_reports': __vp_computed"
+        f"{spec.solver.iterations}, 'computed_reports': __vp_computed, "
+        f"'monitor_history_raw': {monitor_expression}"
         "}"
     )
     lines.append(f"print({RESULT_MARKER!r} + repr(__vp_payload))")

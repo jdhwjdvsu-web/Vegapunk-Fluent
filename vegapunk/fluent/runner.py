@@ -255,6 +255,21 @@ class FluentExperimentRunner:
             payload.get("computed_reports"),
             {report.name for report in self.spec.reports},
         )
+        monitor_history: dict[str, list[float]] = {}
+        if self.spec.optimization is not None:
+            monitor_names = {
+                monitor.report
+                for monitor in self.spec.optimization.numerical_monitors
+            }
+            monitor_history = {name: [] for name in monitor_names}
+            for snapshot in payload.get("monitor_history_raw", []):
+                normalized_snapshot = normalize_computed_reports(
+                    snapshot, monitor_names
+                )
+                for report_name in monitor_names:
+                    monitor_history[report_name].append(
+                        float(normalized_snapshot[report_name]["value"])
+                    )
         objective_report = reports[self.spec.objective.report]
         constraints = _evaluate_constraints(reports, self.spec.constraints)
         residuals = parse_last_residuals(stdout)
@@ -271,6 +286,7 @@ class FluentExperimentRunner:
             "residuals": residuals,
             "convergence": convergence,
             "constraints": constraints,
+            "monitor_history": monitor_history,
             "iterations_requested": self.spec.solver.iterations,
             "elapsed_seconds": elapsed,
             "baseline_reloaded": True,

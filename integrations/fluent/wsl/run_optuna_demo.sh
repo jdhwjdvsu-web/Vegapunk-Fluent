@@ -21,6 +21,16 @@ if [[ -z "${FLUENT_CASE_FILE:-}" ]]; then
   exit 1
 fi
 
+if [[ "${FLUENT_JOB_MODE:-0}" == "1" ]]; then
+  exec "$PYTHON" -m vegapunk.fluent.run_demo \
+    --spec "$SPEC" \
+    --output-dir "$OUTPUT_DIR" \
+    --target-trials "$TARGET_TRIALS" \
+    --endpoint "http://127.0.0.1:18000/mcp" \
+    --job-endpoint "http://$WINDOWS_HOST:18001/mcp" \
+    --allow-remote-endpoint
+fi
+
 exec "$PYTHON" -m vegapunk.fluent.run_demo \
   --spec "$SPEC" \
   --output-dir "$OUTPUT_DIR" \

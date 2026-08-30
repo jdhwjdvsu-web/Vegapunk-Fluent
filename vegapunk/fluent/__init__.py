@@ -9,6 +9,7 @@ from .runner import (
     FluentExperimentRunner,
     FluentStateUncertainError,
 )
+from .directive import OptimizationDirective, load_optimization_directive
 from .spec import ExperimentSpec, OptimizationSpec, SpecError, load_experiment_spec
 
 __all__ = [
@@ -17,6 +18,8 @@ __all__ = [
     "FluentExperimentRunner",
     "FluentStateUncertainError",
     "OptimizationSpec",
+    "OptimizationDirective",
     "SpecError",
     "load_experiment_spec",
+    "load_optimization_directive",
 ]

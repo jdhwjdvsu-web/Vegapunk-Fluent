@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "description": "固定20点无人值守准入计划；故障注入必须在隔离的测试Campaign执行。",
+  "scenarios": [
+    {"scenario_id": "normal-01", "injection": "none"},
+    {"scenario_id": "normal-02", "injection": "none"},
+    {"scenario_id": "normal-03", "injection": "none"},
+    {"scenario_id": "normal-04", "injection": "none"},
+    {"scenario_id": "normal-05", "injection": "none"},
+    {"scenario_id": "normal-06", "injection": "none"},
+    {"scenario_id": "normal-07", "injection": "none"},
+    {"scenario_id": "normal-08", "injection": "none"},
+    {"scenario_id": "normal-09", "injection": "none"},
+    {"scenario_id": "normal-10", "injection": "none"},
+    {"scenario_id": "normal-11", "injection": "none"},
+    {"scenario_id": "normal-12", "injection": "none"},
+    {"scenario_id": "normal-13", "injection": "none"},
+    {"scenario_id": "parameter-out-of-range", "injection": "parameter_gate"},
+    {"scenario_id": "mass-balance-failure", "injection": "result_fixture"},
+    {"scenario_id": "numerical-divergence", "injection": "result_fixture"},
+    {"scenario_id": "trial-timeout", "injection": "worker_delay"},
+    {"scenario_id": "fluent-terminated", "injection": "manual_fluent_stop"},
+    {"scenario_id": "mcp-restart", "injection": "manual_job_service_restart"},
+    {"scenario_id": "controller-restart", "injection": "manual_wsl_controller_restart"}
+  ]
+}

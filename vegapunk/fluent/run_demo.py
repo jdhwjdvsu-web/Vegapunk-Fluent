@@ -20,15 +20,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", default="runs/fluent_demo_v01")
     parser.add_argument("--target-trials", type=int)
     parser.add_argument("--endpoint")
+    parser.add_argument(
+        "--job-endpoint",
+        help="Use the persistent Windows Job MCP instead of direct blocking run_code",
+    )
     parser.add_argument("--allow-remote-endpoint", action="store_true")
     return parser
 
 
 async def _run(args: argparse.Namespace) -> dict:
     spec = load_experiment_spec(args.spec)
-    if args.endpoint:
+    if args.endpoint or args.job_endpoint:
         connection_data = asdict(spec.connection)
-        connection_data["endpoint"] = args.endpoint
+        if args.endpoint:
+            connection_data["endpoint"] = args.endpoint
+        if args.job_endpoint:
+            connection_data["job_endpoint"] = args.job_endpoint
         if args.allow_remote_endpoint:
             connection_data["allow_remote_endpoint"] = True
         spec = replace(spec, connection=ConnectionSpec.from_dict(connection_data))

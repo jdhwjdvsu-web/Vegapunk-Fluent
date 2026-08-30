@@ -3,6 +3,7 @@
   "task_name": "AutoFluentOptunaDemoV01",
   "connection": {
     "endpoint": "http://127.0.0.1:18000/mcp",
+    "baseline_sha256": "8145813f50f989a521ed8d1b02c891c7ca22ccc5fafa35a4eeba011949f19cbc",
     "client_timeout_seconds": 600,
     "reuse_existing_session": false,
     "disconnect_on_exit": true,

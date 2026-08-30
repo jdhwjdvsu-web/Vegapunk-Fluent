@@ -105,6 +105,8 @@ def _is_loopback(hostname: str | None) -> bool:
 @dataclass(frozen=True)
 class ConnectionSpec:
     endpoint: str = "http://127.0.0.1:18000/mcp"
+    job_endpoint: str | None = None
+    baseline_sha256: str | None = None
     connect_kwargs: dict[str, Any] = field(default_factory=dict)
     client_timeout_seconds: int = 300
     allow_remote_endpoint: bool = False
@@ -124,6 +126,29 @@ class ConnectionSpec:
             raise SpecError(
                 "non-loopback Fluent MCP endpoints require allow_remote_endpoint=true"
             )
+        job_endpoint_raw = _expand_env(raw.get("job_endpoint"))
+        job_endpoint = None
+        if job_endpoint_raw is not None:
+            job_endpoint = _non_empty_string(
+                job_endpoint_raw, "connection.job_endpoint"
+            )
+            parsed_job = urlparse(job_endpoint)
+            if parsed_job.scheme not in {"http", "https"} or not parsed_job.hostname:
+                raise SpecError("connection.job_endpoint must be an HTTP(S) MCP URL")
+            if not allow_remote and not _is_loopback(parsed_job.hostname):
+                raise SpecError(
+                    "non-loopback Fluent Job MCP endpoints require "
+                    "allow_remote_endpoint=true"
+                )
+        baseline_sha256 = raw.get("baseline_sha256")
+        if baseline_sha256 is not None:
+            baseline_sha256 = _non_empty_string(
+                baseline_sha256, "connection.baseline_sha256"
+            ).lower()
+            if not re.fullmatch(r"[0-9a-f]{64}", baseline_sha256):
+                raise SpecError(
+                    "connection.baseline_sha256 must contain 64 hexadecimal characters"
+                )
         kwargs = dict(
             _mapping(raw.get("connect_kwargs", {}), "connection.connect_kwargs")
         )
@@ -138,6 +163,8 @@ class ConnectionSpec:
             )
         return cls(
             endpoint=endpoint,
+            job_endpoint=job_endpoint,
+            baseline_sha256=baseline_sha256,
             connect_kwargs=kwargs,
             client_timeout_seconds=timeout,
             allow_remote_endpoint=allow_remote,
@@ -211,6 +238,41 @@ class ParameterSpec:
 
 
 @dataclass(frozen=True)
+class ParameterConstraintSpec:
+    """Safe linear combination constraint; no arbitrary expression evaluation."""
+
+    name: str
+    coefficients: dict[str, float]
+    operator: str
+    value: float
+
+    @classmethod
+    def from_dict(
+        cls, raw: Mapping[str, Any], index: int
+    ) -> ParameterConstraintSpec:
+        prefix = f"parameter_constraints[{index}]"
+        coefficients_raw = _mapping(
+            raw.get("coefficients"), f"{prefix}.coefficients"
+        )
+        if not coefficients_raw:
+            raise SpecError(f"{prefix}.coefficients must not be empty")
+        operator = _non_empty_string(raw.get("operator"), f"{prefix}.operator")
+        if operator not in _OPERATORS:
+            raise SpecError(f"{prefix}.operator is not supported")
+        return cls(
+            name=_non_empty_string(raw.get("name"), f"{prefix}.name"),
+            coefficients={
+                _non_empty_string(name, f"{prefix}.coefficient name"): _number(
+                    coefficient, f"{prefix}.coefficients.{name}"
+                )
+                for name, coefficient in coefficients_raw.items()
+            },
+            operator=operator,
+            value=_number(raw.get("value"), f"{prefix}.value"),
+        )
+
+
+@dataclass(frozen=True)
 class ReportSpec:
     name: str
     kind: str
@@ -231,7 +293,9 @@ class ReportSpec:
             _non_empty_string(item, f"{prefix}.locations") for item in locations_raw
         )
         report_type = raw.get("report_type")
-        field_name = raw.get("field")
+        # ``field`` is the public JSON key; ``field_name`` keeps dataclass
+        # round-trips compatible with ``ExperimentSpec.to_dict()``.
+        field_name = raw.get("field", raw.get("field_name"))
         if kind == "surface" and (report_type is None or field_name is None):
             raise SpecError(f"{prefix} surface reports require report_type and field")
         return cls(
@@ -330,6 +394,77 @@ class SolverSpec:
 
 
 @dataclass(frozen=True)
+class ConservationSpec:
+    """One configurable mass, salt, or component conservation equation."""
+
+    name: str
+    input_reports: tuple[str, ...]
+    output_reports: tuple[str, ...]
+    relative_tolerance: float
+    epsilon: float = 1e-12
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any], index: int) -> ConservationSpec:
+        prefix = f"optimization.conservation_checks[{index}]"
+        inputs = raw.get("input_reports")
+        outputs = raw.get("output_reports")
+        if not isinstance(inputs, list) or not inputs:
+            raise SpecError(f"{prefix}.input_reports must be a non-empty list")
+        if not isinstance(outputs, list) or not outputs:
+            raise SpecError(f"{prefix}.output_reports must be a non-empty list")
+        tolerance = _number(
+            raw.get("relative_tolerance"), f"{prefix}.relative_tolerance"
+        )
+        epsilon = _number(raw.get("epsilon", 1e-12), f"{prefix}.epsilon")
+        if not 0 < tolerance < 1:
+            raise SpecError(f"{prefix}.relative_tolerance must be between zero and one")
+        if epsilon <= 0:
+            raise SpecError(f"{prefix}.epsilon must be positive")
+        return cls(
+            name=_non_empty_string(raw.get("name"), f"{prefix}.name"),
+            input_reports=tuple(
+                _non_empty_string(value, f"{prefix}.input_reports")
+                for value in inputs
+            ),
+            output_reports=tuple(
+                _non_empty_string(value, f"{prefix}.output_reports")
+                for value in outputs
+            ),
+            relative_tolerance=tolerance,
+            epsilon=epsilon,
+        )
+
+
+@dataclass(frozen=True)
+class NumericalMonitorSpec:
+    report: str
+    window: int = 10
+    max_relative_slope: float = 1e-4
+    max_relative_span: float = 1e-3
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any], index: int) -> NumericalMonitorSpec:
+        prefix = f"optimization.numerical_monitors[{index}]"
+        window = int(raw.get("window", 10))
+        slope = _number(
+            raw.get("max_relative_slope", 1e-4), f"{prefix}.max_relative_slope"
+        )
+        span = _number(
+            raw.get("max_relative_span", 1e-3), f"{prefix}.max_relative_span"
+        )
+        if window < 3:
+            raise SpecError(f"{prefix}.window must be at least three")
+        if slope < 0 or span < 0:
+            raise SpecError(f"{prefix} thresholds cannot be negative")
+        return cls(
+            report=_non_empty_string(raw.get("report"), f"{prefix}.report"),
+            window=window,
+            max_relative_slope=slope,
+            max_relative_span=span,
+        )
+
+
+@dataclass(frozen=True)
 class OptimizationSpec:
     """Small, explicit Optuna contract for the Fluent walking skeleton."""
 
@@ -342,6 +477,11 @@ class OptimizationSpec:
     mass_balance_relative_tolerance: float = 0.001
     mass_balance_epsilon: float = 1e-12
     verify_invalid_parameter_gate: bool = True
+    max_attempts_per_trial: int = 2
+    heartbeat_seconds: float = 2.0
+    trial_timeout_seconds: float = 3600.0
+    conservation_checks: tuple[ConservationSpec, ...] = ()
+    numerical_monitors: tuple[NumericalMonitorSpec, ...] = ()
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> OptimizationSpec:
@@ -370,6 +510,46 @@ class OptimizationSpec:
             )
         if epsilon <= 0:
             raise SpecError("optimization.mass_balance_epsilon must be positive")
+        max_attempts = int(
+            raw.get("max_attempts_per_trial", cls.max_attempts_per_trial)
+        )
+        heartbeat = _number(
+            raw.get("heartbeat_seconds", cls.heartbeat_seconds),
+            "optimization.heartbeat_seconds",
+        )
+        trial_timeout = _number(
+            raw.get("trial_timeout_seconds", cls.trial_timeout_seconds),
+            "optimization.trial_timeout_seconds",
+        )
+        if not 1 <= max_attempts <= 10:
+            raise SpecError(
+                "optimization.max_attempts_per_trial must be between one and ten"
+            )
+        if heartbeat <= 0 or trial_timeout <= 0 or heartbeat >= trial_timeout:
+            raise SpecError(
+                "optimization heartbeat must be positive and shorter than Trial timeout"
+            )
+        checks_raw = raw.get("conservation_checks", [])
+        if not isinstance(checks_raw, list):
+            raise SpecError("optimization.conservation_checks must be a list")
+        conservation_checks = tuple(
+            ConservationSpec.from_dict(
+                _mapping(value, f"optimization.conservation_checks[{index}]"), index
+            )
+            for index, value in enumerate(checks_raw)
+        )
+        check_names = [check.name for check in conservation_checks]
+        if len(check_names) != len(set(check_names)):
+            raise SpecError("optimization conservation check names must be unique")
+        monitors_raw = raw.get("numerical_monitors", [])
+        if not isinstance(monitors_raw, list):
+            raise SpecError("optimization.numerical_monitors must be a list")
+        numerical_monitors = tuple(
+            NumericalMonitorSpec.from_dict(
+                _mapping(value, f"optimization.numerical_monitors[{index}]"), index
+            )
+            for index, value in enumerate(monitors_raw)
+        )
         return cls(
             study_name=_non_empty_string(
                 raw.get("study_name", cls.study_name), "optimization.study_name"
@@ -390,6 +570,11 @@ class OptimizationSpec:
             verify_invalid_parameter_gate=bool(
                 raw.get("verify_invalid_parameter_gate", True)
             ),
+            max_attempts_per_trial=max_attempts,
+            heartbeat_seconds=heartbeat,
+            trial_timeout_seconds=trial_timeout,
+            conservation_checks=conservation_checks,
+            numerical_monitors=numerical_monitors,
         )
 
 
@@ -403,6 +588,7 @@ class ExperimentSpec:
     reports: tuple[ReportSpec, ...]
     design_points: tuple[DesignPointSpec, ...]
     objective: ObjectiveSpec
+    parameter_constraints: tuple[ParameterConstraintSpec, ...] = ()
     constraints: tuple[ConstraintSpec, ...] = ()
     optimization: OptimizationSpec | None = None
 
@@ -431,6 +617,22 @@ class ExperimentSpec:
         parameter_by_name = {parameter.name: parameter for parameter in parameters}
         if len(parameter_by_name) != len(parameters):
             raise SpecError("parameter names must be unique")
+        parameter_constraints_raw = raw.get("parameter_constraints", [])
+        if not isinstance(parameter_constraints_raw, list):
+            raise SpecError("parameter_constraints must be a list")
+        parameter_constraints = tuple(
+            ParameterConstraintSpec.from_dict(
+                _mapping(item, f"parameter_constraints[{index}]"), index
+            )
+            for index, item in enumerate(parameter_constraints_raw)
+        )
+        for combination in parameter_constraints:
+            unknown = sorted(set(combination.coefficients) - set(parameter_by_name))
+            if unknown:
+                raise SpecError(
+                    f"parameter constraint {combination.name} references unknown "
+                    f"parameters: {', '.join(unknown)}"
+                )
 
         reports = tuple(
             ReportSpec.from_dict(_mapping(item, f"reports[{index}]"), index)
@@ -483,6 +685,8 @@ class ExperimentSpec:
                     f"constraint report does not exist: {constraint.report}"
                 )
 
+        solver = SolverSpec.from_dict(_mapping(raw.get("solver", {}), "solver"))
+
         optimization_raw = raw.get("optimization")
         optimization = (
             OptimizationSpec.from_dict(_mapping(optimization_raw, "optimization"))
@@ -513,6 +717,24 @@ class ExperimentSpec:
                     raise SpecError(
                         f"optimization.{label} must reference a flux report"
                     )
+            for check in optimization.conservation_checks:
+                for report_name in (*check.input_reports, *check.output_reports):
+                    if report_name not in reports_by_name:
+                        raise SpecError(
+                            f"conservation check {check.name} references unknown "
+                            f"report: {report_name}"
+                        )
+            for monitor in optimization.numerical_monitors:
+                if monitor.report not in reports_by_name:
+                    raise SpecError(
+                        "optimization numerical monitor references unknown report: "
+                        f"{monitor.report}"
+                    )
+                if monitor.window > solver.iterations:
+                    raise SpecError(
+                        f"numerical monitor window {monitor.window} exceeds "
+                        f"solver iterations {solver.iterations}"
+                    )
 
         return cls(
             schema_version=schema_version,
@@ -520,17 +742,20 @@ class ExperimentSpec:
             connection=ConnectionSpec.from_dict(
                 _mapping(raw.get("connection", {}), "connection")
             ),
-            solver=SolverSpec.from_dict(_mapping(raw.get("solver", {}), "solver")),
+            solver=solver,
             parameters=parameters,
             reports=reports,
             design_points=tuple(design_points),
             objective=objective,
+            parameter_constraints=parameter_constraints,
             constraints=constraints,
             optimization=optimization,
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        # ``asdict`` preserves tuples, while specs cross JSON/MCP boundaries and
+        # need a canonical JSON-native representation.
+        return json.loads(json.dumps(asdict(self), ensure_ascii=False))
 
 
 def load_experiment_spec(path: str | os.PathLike[str]) -> ExperimentSpec:

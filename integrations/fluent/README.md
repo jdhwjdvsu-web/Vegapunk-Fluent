@@ -188,21 +188,84 @@ There is intentionally no cancel button: interrupting a submitted solver call ca
 leave Fluent state uncertain, and the controller requires an explicit restart in
 that situation.
 
-## v0.1 limitations and deferred work
+## 6. Run the persistent V1 Job path
+
+Job mode adds a second Windows MCP endpoint. Keep the official PyFluent-MCP on port
+18000, then start the Vegapunk Job facade on port 18001 in another PowerShell:
+
+```powershell
+cd D:\Vegapunk-Fluent\integrations\fluent\windows
+.\start_pyfluent_mcp.ps1 -BindAddress 0.0.0.0 -Port 18000
+.\start_vegapunk_job_mcp.ps1 -BindAddress 0.0.0.0 -Port 18001
+```
+
+The Job endpoint persists `job.json`, `events.jsonl`, `result.json`, and
+`transcript.log` under `%LOCALAPPDATA%\Vegapunk\fluent-jobs\jobs\job-*`. It returns a
+stable `job_id` immediately, deduplicates the same Campaign/Trial/Attempt, and marks
+nonterminal work `ORPHANED` after a service restart.
+
+Enable the Job-backed Controller from WSL:
+
+```bash
+cd /mnt/d/Vegapunk-Fluent
+export FLUENT_CASE_FILE='C:\path\to\mixing_elbow.cas.h5'
+export FLUENT_JOB_MODE=1
+bash integrations/fluent/wsl/run_optuna_demo.sh \
+  config/fluent/mixing_elbow.optuna-demo.json \
+  runs/fluent_job_v1 \
+  20
+```
+
+The Controller polls heartbeats, applies the per-Trial timeout, retries failed or
+explicitly `retry_safe` attempts from the immutable baseline, and persists the V1
+state chain through `CREATED → SUBMITTED → RUNNING → RESULT_READY → GATED → TOLD`.
+An orphan with unconfirmed worker termination stops for manual recovery instead of
+risking a duplicate Fluent solve.
+
+## 7. Stage-0 and Stage-4 admission tools
+
+Repeatability thresholds are data-driven rather than hard-coded to 0.1%:
+
+```bash
+python -m vegapunk.fluent.baseline \
+  --input baseline_records.json \
+  --output baseline_assessment.json
+```
+
+After the isolated fault-injection Campaign, validate its 20 evidence records:
+
+```bash
+python -m vegapunk.fluent.acceptance \
+  --input acceptance_records.json \
+  --output acceptance_summary.json
+```
+
+The fixed plan is `config/fluent/acceptance_v1.json`. Manual Fluent termination,
+MCP restart, and WSL Controller restart are intentionally explicit test actions; the
+validator never pretends those failures happened when they were not actually run.
+
+## V1 limitations and deferred work
 
 - Serial execution only; there is no Fluent worker pool or parallel study.
-- A transport failure after `run_code` submission terminates the controller because
-  Fluent state is uncertain. The same solve is never retried blindly.
-- Recovery is controlled process restart through SQLite, not heartbeat, watchdog,
-  job queue, or automated crash recovery.
+- Job mode provides heartbeat, timeout, retry, idempotency and persisted state. A
+  Job-service crash is persisted as `ORPHANED`; because the old Fluent process cannot
+  yet be terminated or reattached with certainty, the Controller refuses an automatic
+  retry until an operator confirms cleanup.
+- Running-Job cancellation deliberately returns `cancelled=false` until the
+  downstream PyFluent service can confirm that Fluent actually stopped. Queued Jobs
+  can be cancelled safely. This prevents false cancellation and duplicate solves.
 - Parameters are existing Fluent settings only. Geometry edits and remeshing are out
   of scope.
-- One scalar objective and independent float parameters are supported. Multi-objective
-  optimization, coupled constraints, surrogate models and multi-fidelity runs are
-  deferred.
-- The demo records residuals but does not reject on a residual threshold; the
-  acceptance gate is finite outputs plus mass conservation.
-- Baseline identity is the configured case path. Content hashing, campaign versions,
-  solver/build fingerprints and immutable case archival are deferred.
+- One scalar objective, one to five numeric parameters, safe linear parameter
+  combinations, engineering constraints, mass balance, configurable salt/component
+  balances, residuals and last-N report stationarity are supported. Multi-objective,
+  surrogate and multi-fidelity optimization remain deferred.
+- Campaign fingerprints include the model identity, search space, objective,
+  constraints, solver, Gate version and Optuna version. Put the Stage-0 case digest in
+  `connection.baseline_sha256`; without it, the canonical case path is the baseline
+  identity.
 - Vegapunk exposes this as an explicit integration command; autonomous outer-loop
   research orchestration is not part of v0.1.
+
+The detailed implementation/acceptance matrix is in
+`docs/Fluent_V1_实施核对.md`.

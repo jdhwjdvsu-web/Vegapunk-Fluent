@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "executed_at": "2026-08-30T13:28:48Z",
+  "campaign_id": "autofluentoptunademov01-d571931609fe",
+  "job_id": "job-a4ff42fb7bac240d12af",
+  "job_state": "SUCCEEDED",
+  "idempotent_resubmit_verified": true,
+  "reconnect_query_verified": true,
+  "parameter": {
+    "cold_inlet_velocity": 0.6621780831931539,
+    "unit": "m/s"
+  },
+  "objective": {
+    "name": "outlet-temp-avg",
+    "value": 294.7843406982414,
+    "unit": "K"
+  },
+  "mass_balance_relative_error": 1.5698248687406342e-06,
+  "gate": "PASS",
+  "iterations_requested": 100,
+  "fluent_execution_count": 1
+}

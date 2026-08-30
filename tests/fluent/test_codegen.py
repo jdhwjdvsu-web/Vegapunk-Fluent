@@ -55,3 +55,24 @@ def test_parse_last_residual_row():
     residuals = parse_last_residuals(stdout)
     assert residuals["iteration"] == 5
     assert residuals["values"]["continuity"] == 8.0e-4
+
+
+def test_numerical_monitor_codegen_samples_last_n_report_values():
+    raw = minimal_spec()
+    raw["reports"].extend(
+        [
+            {"name": "mass-in", "kind": "flux", "locations": ["inlet"]},
+            {"name": "mass-out", "kind": "flux", "locations": ["outlet"]},
+        ]
+    )
+    raw["optimization"] = {
+        "mass_flow_in_report": "mass-in",
+        "mass_flow_out_report": "mass-out",
+        "numerical_monitors": [
+            {"report": "outlet-temperature", "window": 5}
+        ],
+    }
+    spec = ExperimentSpec.from_dict(raw)
+    code = build_design_point_code(spec, spec.design_points[0])
+    assert "for __vp_chunk_size in [1, 1, 1, 1, 1]" in code
+    assert "monitor_history_raw" in code
