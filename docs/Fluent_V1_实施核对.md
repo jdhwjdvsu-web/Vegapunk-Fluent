@@ -1,6 +1,6 @@
 # Fluent 无人值守 V1 实施核对
 
-核对日期：2026-08-30
+核对日期：2026-08-31
 
 核对范围：评审文档“科研可用、串行、可断点恢复的无人值守 V1”
 
@@ -8,20 +8,20 @@
 
 ## 总体结论
 
-当前已经从“可演示的串行 Optuna walking skeleton”推进为“具备 Job、账本、恢复与完整 Gate 语义的 V1 代码骨架”。自动测试全部通过，Windows Job MCP 已完成实际启动和 `worker_health` 调用，并用真实 Mixing Elbow case 完成 1 个端到端 Job Trial。
+Mixing Elbow 系统准入已经完成：3 次冷启动、同一会话连续 10 次重复性测试和固定 20 点故障容错计划均取得真实证据，`baseline_assessment.json` 与 `acceptance_summary.json` 均为 `passed=true`。13 个正常优化点全部通过 Gate；WSL Controller 中断后恢复了同一个 Job；完整 Fluent 进程树终止被识别为可安全重试的失败；Job MCP 重启把未确认停止的 Job 保守恢复为 `ORPHANED`，没有重复提交。
 
-系统仍不能宣布“无人值守 V1 验收完成”，因为基准重复性、真实 Windows Fluent Job 断线续查、Fluent 终止/服务重启故障注入和固定 20 点准入尚未在真实求解器上执行。
+这表示“科研可用、串行、可断点恢复的无人值守 V1”的系统链路已通过 Mixing Elbow 准入，但不等于水处理科研模型已经验收。水处理 Case 的盐分/组分报告、阈值和网格无关性仍需使用真实模型完成。
 
 ## 分阶段状态
 
 | 阶段 | 当前状态 | 已完成 | 仍需完成 |
 |---|---|---|---|
-| 0 基准与范围冻结 | 部分完成 | 固定 Mixing Elbow case；基准重载；新增重复性分析器；容差由输入数据配置 | 冷启动 3 次、连续 10 次、进程内存记录、执行顺序测试、人工网格无关性 |
-| 1 Windows MCP Job 化 | 核心闭环已实测，取消验收未完成 | 五个 Job 工具；稳定 Job ID；原子 JSON；事件日志；单 Worker；重启标记 `ORPHANED`；真实 Job 完成后新客户端可查询；重复提交返回原 `job_id` 且 `idempotent=true` | 运行中取消仍需下游确认 Fluent 实际停止；Job 服务进程崩溃后的真实旧进程清理测试 |
-| 2 Controller 与恢复 | 正常路径已实测，故障恢复待验收 | V1 Trial 状态账本；心跳；Trial 超时；安全失败重试；未确认停止的 `ORPHANED` 禁止自动重试；结果后只补 Gate/Tell；SQLite pending tell 恢复；真实 Trial 到达 `TOLD` | 增加旧 Fluent 进程确认终止能力后再开放 ORPHANED 自动重试；人工杀 Fluent、关闭 Job MCP、终止 WSL Controller 的真实故障注入；许可证重新检出行为确认 |
-| 3 最小四级 Gate | 大部分代码完成 | 参数白名单/类型/单位/上下限；安全线性组合约束；基线摘要；有限值；残差；last-N 监测量斜率/波动；质量守恒；通用盐分/组分守恒；PASS/CONSTRAINT/DIVERGED 分类 | 填写实际盐分报告名与阈值；Stage-0 case SHA-256；网格精度人工结论；真实 monitor history 验证 |
-| 4 固定 20 点容错 | 工具完成、真实运行未完成 | 固定 20 点计划；结果一致性/重复计算/无效最优检查器；模拟准入测试 | 在隔离 Campaign 完成 13 正常点和 7 故障点，并生成真实 evidence records |
-| 5 串行 Optuna | 代码完成、准入待定 | 固定 seed；TPE startup；ask/tell；SQLite 单 writer；Campaign 指纹；约束向量；DIVERGED→FAIL；中断后补 tell；完整优化摘要 | 必须先通过真实固定 20 点；建议再跑 20～50 个正式 Trial |
+| 0 基准与范围冻结 | Mixing Elbow 已通过 | Case SHA-256 固定；3 次冷启动；同一会话连续 10 次；结果/耗时/Fluent+Cortex 内存记录；基准分析 `passed=true` | 水处理真实 Case 的人工网格无关性 |
+| 1 Windows MCP Job 化 | 核心闭环与重启已实测，取消验收未完成 | 五个 Job 工具；稳定 Job ID；原子 JSON；事件日志；单 Worker；真实重启把运行中 Job 标记 `ORPHANED`；旧 Fluent 树按精确 PID 清理；完成后重连查询与幂等重提已验证 | 运行中取消仍需下游确认 Fluent 实际停止；通用自动旧进程回收尚未开放 |
+| 2 Controller 与恢复 | Mixing Elbow 故障路径已通过 | 状态账本；心跳；超时；安全失败重试；不安全 ORPHANED 禁止重试；中断 WSL Controller 后恢复同一个 Job 到 `TOLD`；人工终止 Fluent 与重启 Job MCP 已实测 | 许可证服务器断开/重新检出仍需有相应环境后验证 |
+| 3 最小四级 Gate | Mixing Elbow 已通过，水处理待配置 | 参数门；线性组合约束；有限值；残差；last-N 稳定性；质量及组分守恒；PASS/CONSTRAINT/DIVERGED 分类；真实质量守恒与故障夹具已验证 | 填写水处理盐分报告名与阈值；真实水处理 monitor history；网格精度人工结论 |
+| 4 固定 20 点容错 | 已通过 | 独立 Campaign 完成 13 正常点与 7 故障点；20 条 evidence records；无重复计算、非终态、无效最优或不一致文件 | 水处理 Case 上可按需复验，不是系统 V1 阻塞项 |
+| 5 串行 Optuna | Mixing Elbow 准入完成 | 固定 seed；TPE startup；ask/tell；SQLite 单 writer；Campaign 指纹；约束向量；DIVERGED→FAIL；恢复与优化摘要；13 点全部 PASS | 配置水处理模型后建议跑 20～50 个正式 Trial |
 | 6 Vegapunk 外循环 | 部分完成 | `optimization_summary.json`；兼容 `final_info.json`；正式 `OptimizationDirective` 文件契约与人工批准校验；UI 人工批准门 | 子 Campaign 创建入口、Vegapunk 评分链实际接线；自动批准仍暂缓 |
 
 ## 本轮新增代码
@@ -52,14 +52,25 @@
 - 可提交摘要：`docs/fluent_job_v1_smoke_summary.json`
 - 本机完整 WSL 证据目录：`runs/fluent_job_v1_smoke/`
 
+## 真实 V1 准入证据（2026-08-31）
+
+- 基线：3 次冷启动 + 同一会话连续 10 次，13 次出口温度和质量流量相对离散度均为 0。
+- 连续内存：1580.546875 MB → 1591.0390625 MB，增长 0.6638%，低于 10% 门限。
+- 正常 Campaign：`autofluentacceptancev01-9e07d955ed25`，13/13 `PASS`。
+- Controller 重启：`job-bc99c727a0dd44aeb614` 只进入一次 `RUNNING`，恢复到 `TOLD/PASS`。
+- Fluent 终止：`job-e067789f9f9597f8e71a` 进入 `FAILED`，gRPC 丢失被记录，`retry_safe=true`，无结果文件。
+- Job MCP 重启：`job-1bb2faebed35740e9512` 进入 `ORPHANED`，`retry_safe=false`，无自动重复提交。
+- 固定 20 点：`acceptance_summary.json` 为 `passed=true`，全部异常列表为空。
+- 可提交摘要：`docs/fluent_v1_acceptance_20260831_summary.json`。
+- 本机完整证据：`runs/fluent_v1_acceptance_20260831/`；Windows Job 原始账本位于外部 Job Store。
+
 ## 下一次真实 Fluent 操作顺序
 
-1. 对选定 case 计算 SHA-256，写入 `connection.baseline_sha256`。
-2. 记录 3 次冷启动和 10 次连续运行的指标、耗时、Fluent 内存，运行 `vegapunk.fluent.baseline`。
-3. Windows 同时启动端口 18000 的 PyFluent-MCP 和端口 18001 的 Job MCP。
-4. 用 `FLUENT_JOB_MODE=1` 先执行 1 个 Trial，断开 WSL 客户端后重新查询同一个 `job_id`。
-5. 在隔离 Campaign 执行 `config/fluent/acceptance_v1.json`，按计划人工注入三类进程故障。
-6. 只有 `acceptance_summary.json` 为 `passed=true` 后，才开始 20～50 Trial 的正式 Optuna Campaign。
+1. 提供水处理 `.cas.h5`/`.cas` 基线和粗、中、细三套网格，冻结 SHA-256。
+2. 明确允许外部修改的 1～5 个参数及单位、上下限。
+3. 明确目标报告、质量流报告、盐分/组分报告和工程阈值。
+4. 对水处理模型完成 3 次冷启动、连续 10 次与人工网格无关性结论。
+5. 先跑 1 个水处理端到端 Trial，再启动 20～50 Trial 正式串行 Campaign。
 
 ## 明确暂缓
 

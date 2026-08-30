@@ -243,6 +243,9 @@ python -m vegapunk.fluent.acceptance \
 The fixed plan is `config/fluent/acceptance_v1.json`. Manual Fluent termination,
 MCP restart, and WSL Controller restart are intentionally explicit test actions; the
 validator never pretends those failures happened when they were not actually run.
+The real Mixing Elbow run from 2026-08-31 is summarized in
+`docs/fluent_v1_acceptance_20260831_summary.json`; full local evidence is kept under
+`runs/fluent_v1_acceptance_20260831/` and the external Windows Job Store.
 
 ## V1 limitations and deferred work
 

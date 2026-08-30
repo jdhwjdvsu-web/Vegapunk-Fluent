@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "case": "ANSYS Mixing Elbow",
+  "baseline_sha256": "8145813f50f989a521ed8d1b02c891c7ca22ccc5fafa35a4eeba011949f19cbc",
+  "stage0": {
+    "passed": true,
+    "cold_runs": 3,
+    "sequence_runs": 10,
+    "outlet_temperature_mean_k": 295.0364218442149,
+    "metric_relative_spread": 0.0,
+    "sequence_memory_start_mb": 1580.546875,
+    "sequence_memory_end_mb": 1591.0390625,
+    "sequence_memory_growth_fraction": 0.006638327319460235,
+    "memory_growth_tolerance": 0.1
+  },
+  "fixed20": {
+    "passed": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "observed_points": 20,
+    "normal_points": 13,
+    "normal_gate_counts": {"PASS": 13},
+    "best_trial_number": 6,
+    "best_parameter": {"cold_inlet_velocity": 1.0995201301007693},
+    "best_objective_k": 294.2687028549982,
+    "missing": [],
+    "duplicate_scenarios": [],
+    "duplicate_computations": [],
+    "nonterminal": [],
+    "invalid_selected_as_best": [],
+    "inconsistent_artifacts": []
+  },
+  "process_faults": {
+    "controller_restart": {
+      "job_id": "job-bc99c727a0dd44aeb614",
+      "final_state": "TOLD",
+      "gate": "PASS",
+      "fluent_execution_count": 1
+    },
+    "fluent_terminated": {
+      "job_id": "job-e067789f9f9597f8e71a",
+      "final_state": "FAILED",
+      "retry_safe": true,
+      "result_file_created": false,
+      "fluent_execution_count": 1
+    },
+    "job_mcp_restart": {
+      "job_id": "job-1bb2faebed35740e9512",
+      "final_state": "ORPHANED",
+      "retry_safe": false,
+      "result_file_created": false,
+      "fluent_execution_count": 1
+    }
+  },
+  "notes": [
+    "Parameter, mass-balance, numerical-divergence, and timeout probes used the fixed acceptance plan's gate/result/delay injections.",
+    "A preliminary Fluent process-name calibration completed successfully after only launcher processes were stopped; it was excluded from the fixed 20 evidence. The admitted fault stopped the verified full Fluent/Cortex/MPI process tree."
+  ]
+}
