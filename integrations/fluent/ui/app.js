@@ -10,8 +10,13 @@ const elements = {
   caseFile: $("#case-file"),
   targetTrials: $("#target-trials"),
   iterations: $("#iterations"),
-  velocityMin: $("#velocity-min"),
-  velocityMax: $("#velocity-max"),
+  parameterSelect: $("#parameter-select"),
+  rangeMin: $("#range-min"),
+  rangeMax: $("#range-max"),
+  rangeUnitMin: $("#range-unit-min"),
+  rangeUnitMax: $("#range-unit-max"),
+  parameterDescription: $("#parameter-description"),
+  parameterSafetyHint: $("#parameter-safety-hint"),
   endpoint: $("#endpoint"),
   budgetTrials: $("#budget-trials"),
   mcpDot: $("#mcp-dot"),
@@ -36,11 +41,35 @@ const elements = {
   resultCount: $("#result-count"),
   resultBestTemp: $("#result-best-temp"),
   resultBestVelocity: $("#result-best-velocity"),
+  resultParameterLabel: $("#result-parameter-label"),
+  resultParameterUnit: $("#result-parameter-unit"),
   resultInsight: $("#result-insight"),
+  directForm: $("#direct-run-form"),
+  directParameterSelect: $("#direct-parameter-select"),
+  directValue: $("#direct-value"),
+  directUnit: $("#direct-unit"),
+  directRangeHint: $("#direct-range-hint"),
+  directButton: $("#direct-run-button"),
+  directButtonLabel: $("#direct-run-button-label"),
+  directError: $("#direct-run-error"),
+  directResult: $("#direct-run-result"),
+  directTemperature: $("#direct-temperature"),
+  directMassError: $("#direct-mass-error"),
+  directGate: $("#direct-gate"),
+  directContour: $("#direct-contour"),
+  directCaption: $("#direct-caption"),
   agentResult: $("#agent-result-message"),
   agentThread: $("#agent-thread"),
   agentForm: $("#agent-form"),
   agentQuestion: $("#agent-question"),
+  clearConversation: $("#clear-conversation"),
+  newTaskButton: $("#new-task-button"),
+  currentTaskLabel: $("#current-task-label"),
+  projectParameterLabel: $("#project-parameter-label"),
+  monitorTitle: $("#monitor-title"),
+  bestParameterUnit: $("#best-parameter-unit"),
+  parameterChartSubtitle: $("#parameter-chart-subtitle"),
+  trialParameterHeader: $("#trial-parameter-header"),
   footerTrial: $("#footer-trial"),
   footerFluentDot: $("#footer-fluent-dot"),
   footerFluent: $("#footer-fluent"),
@@ -51,7 +80,11 @@ const elements = {
 
 let initialized = false;
 let submitting = false;
+let directSubmitting = false;
 let lastState = null;
+let parameterCatalog = [];
+let selectedParameterKey = "cold_inlet_velocity";
+let lastConversationRevision = null;
 
 function switchView(name, openAdvanced = false) {
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${name}`));
@@ -64,14 +97,76 @@ $$('[data-view]').forEach((button) => {
   button.addEventListener("click", () => switchView(button.dataset.view, button.dataset.openAdvanced === "true"));
 });
 
-function setInputValues(defaults) {
+function parameterByKey(key) {
+  return parameterCatalog.find((item) => item.key === key) || parameterCatalog[0] || null;
+}
+
+function populateParameterSelect(select, selectedKey) {
+  select.replaceChildren();
+  const categories = [...new Set(parameterCatalog.map((item) => item.category))];
+  categories.forEach((category) => {
+    const group = document.createElement("optgroup");
+    group.label = category;
+    parameterCatalog.filter((item) => item.category === category).forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.key;
+      option.textContent = `${item.label} · ${item.zone}`;
+      option.selected = item.key === selectedKey;
+      group.append(option);
+    });
+    select.append(group);
+  });
+}
+
+function applyParameterInputs(key, useRecommended = true) {
+  const parameter = parameterByKey(key);
+  if (!parameter) return;
+  selectedParameterKey = parameter.key;
+  elements.parameterSelect.value = parameter.key;
+  elements.rangeMin.min = parameter.hard_min;
+  elements.rangeMin.max = parameter.hard_max;
+  elements.rangeMin.step = parameter.step;
+  elements.rangeMax.min = parameter.hard_min;
+  elements.rangeMax.max = parameter.hard_max;
+  elements.rangeMax.step = parameter.step;
+  if (useRecommended) {
+    elements.rangeMin.value = parameter.recommended_min;
+    elements.rangeMax.value = parameter.recommended_max;
+  }
+  elements.rangeUnitMin.textContent = parameter.unit;
+  elements.rangeUnitMax.textContent = parameter.unit;
+  elements.parameterDescription.textContent = parameter.description;
+  elements.parameterSafetyHint.textContent = `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
+  elements.projectParameterLabel.textContent = parameter.label;
+  elements.monitorTitle.textContent = `${parameter.label}优化`;
+}
+
+function applyDirectParameter(key, useDefault = true) {
+  const parameter = parameterByKey(key);
+  if (!parameter) return;
+  elements.directParameterSelect.value = parameter.key;
+  elements.directValue.min = parameter.hard_min;
+  elements.directValue.max = parameter.hard_max;
+  elements.directValue.step = parameter.step;
+  if (useDefault) elements.directValue.value = parameter.default_value;
+  elements.directUnit.textContent = parameter.unit;
+  elements.directRangeHint.textContent = `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议范围 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
+}
+
+function setInputValues(defaults, parameters) {
   if (initialized) return;
+  parameterCatalog = parameters || [];
+  populateParameterSelect(elements.parameterSelect, defaults.parameter_key);
+  populateParameterSelect(elements.directParameterSelect, defaults.direct_parameter_key);
   elements.caseFile.value = defaults.case_file || "";
   elements.targetTrials.value = defaults.target_trials;
   elements.iterations.value = defaults.iterations;
-  elements.velocityMin.value = defaults.velocity_min;
-  elements.velocityMax.value = defaults.velocity_max;
   elements.endpoint.value = defaults.endpoint;
+  applyParameterInputs(defaults.parameter_key || parameterCatalog[0]?.key);
+  elements.rangeMin.value = defaults.range_min;
+  elements.rangeMax.value = defaults.range_max;
+  applyDirectParameter(defaults.direct_parameter_key || defaults.parameter_key || parameterCatalog[0]?.key);
+  elements.directValue.value = defaults.direct_value;
   elements.budgetTrials.textContent = defaults.target_trials;
   const path = defaults.case_file || "尚未配置 case 路径";
   elements.modelPath.textContent = path;
@@ -87,9 +182,9 @@ function formatNumber(value, digits = 3) {
 
 function validTrials(trials) {
   return trials.filter((trial) => {
-    const velocity = Number(trial.parameters?.cold_inlet_velocity);
+    const parameter = Number(trial.parameters?.[selectedParameterKey]);
     const objective = Number(trial.objective_value);
-    return trial.state === "COMPLETE" && Number.isFinite(velocity) && Number.isFinite(objective);
+    return ["COMPLETE", "PASS"].includes(trial.state) && Number.isFinite(parameter) && Number.isFinite(objective);
   });
 }
 
@@ -103,25 +198,57 @@ function renderStatus(state) {
   elements.footerFluent.textContent = online ? "Connected" : "Offline";
 
   const labels = { idle: "待命", running: "运行中", completed: "已完成", failed: "异常" };
-  elements.jobBadge.innerHTML = `<i></i>${labels[state.job.status] || state.job.status}`;
-  elements.jobBadge.className = `job-badge ${state.job.status}`;
-  elements.runningPulse.classList.toggle("running", state.job.status === "running");
-  elements.footerRunner.textContent = state.job.status === "running" ? "Running" : state.job.status === "failed" ? "Failed" : "Idle";
+  const directStatus = state.direct_run?.status || "idle";
+  const busy = state.job.status === "running" || directStatus === "running";
+  const failed = state.job.status === "failed" || directStatus === "failed";
+  const visibleStatus = directStatus === "running" ? directStatus : state.job.status;
+  elements.jobBadge.innerHTML = `<i></i>${labels[visibleStatus] || visibleStatus}`;
+  elements.jobBadge.className = `job-badge ${visibleStatus}`;
+  elements.runningPulse.classList.toggle("running", busy);
+  elements.footerRunner.textContent = busy ? "Running" : failed ? "Failed" : "Idle";
 
-  const canRun = state.server.can_control && state.job.status !== "running";
+  const canRun = state.server.can_control && !busy;
   elements.runButton.disabled = !canRun || submitting;
-  elements.runButtonLabel.textContent = state.job.status === "running" ? "实验正在运行" : "批准并开始实验";
+  elements.runButtonLabel.textContent = busy ? "Fluent 正在运行" : "批准并开始实验";
+  elements.directButton.disabled = !canRun || directSubmitting;
+  elements.newTaskButton.disabled = !state.server.can_control || busy;
+  elements.clearConversation.disabled = !state.server.can_control;
+  elements.directButtonLabel.textContent = directStatus === "running" ? "Fluent 计算中" : "计算并生成云图";
   if (!state.server.can_control) {
     elements.formNote.textContent = "当前是远程只读视图。请在运行服务的电脑上打开本机地址批准实验。";
-  } else if (state.job.status === "running") {
+  } else if (busy) {
     elements.formNote.textContent = "Fluent 正在串行求解。关闭页面不会中止当前实验。";
   }
   elements.formError.textContent = state.job.error || "";
 }
 
+function renderDirectRun(state) {
+  const direct = state.direct_run || {};
+  const result = direct.result;
+  elements.directError.textContent = direct.error || "";
+  if (!result) {
+    elements.directResult.hidden = true;
+    return;
+  }
+  const relativeError = Number(result.mass_balance_relative_error);
+  const parameter = result.parameter || {};
+  elements.directResult.hidden = false;
+  elements.directTemperature.textContent = formatNumber(result.objective_value, 3);
+  elements.directMassError.textContent = Number.isFinite(relativeError)
+    ? `${(relativeError * 100).toExponential(3)}%`
+    : "—";
+  elements.directGate.textContent = result.mass_balance_gate_passed ? "PASS" : "REVIEW";
+  elements.directGate.style.color = result.mass_balance_gate_passed ? "var(--green)" : "var(--red)";
+  const cacheKey = encodeURIComponent(result.run_id || Date.now());
+  elements.directContour.src = `${result.image_url}?v=${cacheKey}`;
+  const classification = result.classification === "out_of_baseline_range" ? "扩展异常工况" : "基准范围工况";
+  elements.directCaption.textContent = `Fluent 原生 Static Temperature 云图 · ${parameter.label || parameter.key || "参数"} ${formatNumber(parameter.display_value, 4)} ${parameter.unit || ""} · ${classification}`;
+}
+
 function renderMetrics(state) {
   const summary = state.summary || {};
   const trials = validTrials(state.trials || []);
+  const parameter = parameterByKey(selectedParameterKey);
   const completed = state.job.completed_trials || trials.length;
   const target = state.job.target_trials || state.defaults.target_trials || 0;
   const percent = target ? Math.min(100, (completed / target) * 100) : 0;
@@ -135,12 +262,16 @@ function renderMetrics(state) {
   elements.resultCount.textContent = completed;
 
   const bestValue = summary.best_value;
-  const bestVelocity = summary.best_params?.cold_inlet_velocity;
+  const bestNativeValue = summary.best_params?.[selectedParameterKey];
+  const bestParameterValue = Number(bestNativeValue) * Number(parameter?.native_to_display || 1);
   elements.bestTemperature.textContent = formatNumber(bestValue, 3);
-  elements.bestVelocity.textContent = formatNumber(bestVelocity, 4);
+  elements.bestVelocity.textContent = formatNumber(bestParameterValue, 4);
+  elements.bestParameterUnit.textContent = parameter?.unit || "—";
   elements.bestTrial.textContent = summary.best_trial_number == null ? "尚无结果" : `Trial #${summary.best_trial_number}`;
   elements.resultBestTemp.textContent = formatNumber(bestValue, 3);
-  elements.resultBestVelocity.textContent = formatNumber(bestVelocity, 4);
+  elements.resultBestVelocity.textContent = formatNumber(bestParameterValue, 4);
+  elements.resultParameterLabel.textContent = parameter?.label || "参数";
+  elements.resultParameterUnit.textContent = parameter?.unit || "—";
 
   if (trials.length > 1) {
     const first = Number(trials[0].objective_value);
@@ -154,8 +285,8 @@ function renderMetrics(state) {
 
   const allPassed = trials.length > 0 && trials.every((trial) => trial.gates?.passed !== false);
   elements.footerGate.textContent = allPassed ? "All passed" : trials.length ? "Review" : "—";
-  if (bestVelocity != null) {
-    elements.resultInsight.textContent = `当前最优点位于 ${formatNumber(bestVelocity, 4)} m/s。若需要更高精度，可围绕该点缩小参数范围并增加目标 Trial 数。`;
+  if (Number.isFinite(bestParameterValue)) {
+    elements.resultInsight.textContent = `当前最优点位于 ${formatNumber(bestParameterValue, 4)} ${parameter?.unit || ""}。若需要更高精度，可围绕该点缩小参数范围并增加目标 Trial 数。`;
   }
 
   const updated = summary.updated_at ? new Date(summary.updated_at) : new Date();
@@ -244,6 +375,8 @@ function renderChart(container, points, options) {
 
 function renderCharts(trials) {
   const points = validTrials(trials);
+  const parameter = parameterByKey(selectedParameterKey);
+  const displayValue = (trial) => Number(trial.parameters?.[selectedParameterKey]) * Number(parameter?.native_to_display || 1);
   renderChart(elements.objectiveChart, points, {
     x: (trial) => Number(trial.trial_number), y: (trial) => Number(trial.objective_value),
     xFormat: (value) => `#${Math.max(0, Math.round(value))}`, xLabel: "Trial", line: true, area: true,
@@ -251,15 +384,18 @@ function renderCharts(trials) {
     tooltip: (trial) => `Trial #${trial.trial_number} · ${formatNumber(trial.objective_value, 3)} K`,
   });
   renderChart(elements.parameterChart, points, {
-    x: (trial) => Number(trial.parameters.cold_inlet_velocity), y: (trial) => Number(trial.objective_value),
-    xFormat: (value) => value.toFixed(2), xLabel: "Cold inlet velocity (m/s)", line: false, area: false,
+    x: displayValue, y: (trial) => Number(trial.objective_value),
+    xFormat: (value) => value.toFixed(2), xLabel: `${parameter?.label || "Parameter"} (${parameter?.unit || "—"})`, line: false, area: false,
     empty: "等待有效参数点",
-    tooltip: (trial) => `${formatNumber(trial.parameters.cold_inlet_velocity, 4)} m/s · ${formatNumber(trial.objective_value, 3)} K`,
+    tooltip: (trial) => `${formatNumber(displayValue(trial), 4)} ${parameter?.unit || ""} · ${formatNumber(trial.objective_value, 3)} K`,
   });
+  elements.parameterChartSubtitle.textContent = `${parameter?.label || "Parameter"} / outlet temperature`;
 }
 
 function renderTable(trials) {
   elements.table.replaceChildren();
+  const parameter = parameterByKey(selectedParameterKey);
+  elements.trialParameterHeader.textContent = parameter?.label || "Parameter";
   if (!trials.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
@@ -278,7 +414,7 @@ function renderTable(trials) {
     const values = [
       `#${trial.trial_number}`,
       trial.sampling_phase === "startup_random" ? "Random" : "TPE",
-      `${formatNumber(trial.parameters?.cold_inlet_velocity, 4)} m/s`,
+      `${formatNumber(Number(trial.parameters?.[selectedParameterKey]) * Number(parameter?.native_to_display || 1), 4)} ${parameter?.unit || ""}`,
       `${formatNumber(trial.objective_value, 3)} K`,
       Number.isFinite(relativeError) ? `${(relativeError * 100).toExponential(2)}%` : "—",
       trial.duration_seconds == null ? "—" : `${formatNumber(trial.duration_seconds, 1)} s`,
@@ -302,9 +438,17 @@ function renderTable(trials) {
 function renderAgentState(state) {
   const trials = validTrials(state.trials || []);
   const best = state.summary?.best_value;
+  const direct = state.direct_run || {};
   const paragraph = elements.agentResult.querySelector("p");
   const time = elements.agentResult.querySelector("time");
-  if (state.job.status === "running") {
+  if (direct.status === "running") {
+    const parameter = parameterByKey(elements.directParameterSelect.value);
+    paragraph.textContent = `单点工况已提交。MCP 正在修改${parameter?.label || "所选参数"}、运行 Fluent 并生成温度云图。`;
+    time.textContent = "Fluent 单点计算中";
+  } else if (direct.status === "completed" && direct.result) {
+    paragraph.textContent = `单点计算完成：出口平均温度 ${formatNumber(direct.result.objective_value, 3)} K，温度云图已生成。`;
+    time.textContent = "单点结果";
+  } else if (state.job.status === "running") {
     paragraph.textContent = `Trial ${trials.length + 1} 正在运行。若发生传输不确定性，控制器会停止，不会盲目重试。`;
     time.textContent = "实验运行中";
   } else if (trials.length) {
@@ -316,17 +460,34 @@ function renderAgentState(state) {
   }
 }
 
+function clearConversationView() {
+  let node = elements.agentResult.nextElementSibling;
+  while (node) {
+    const next = node.nextElementSibling;
+    node.remove();
+    node = next;
+  }
+  elements.agentQuestion.value = "";
+}
+
 async function refresh() {
   try {
     const response = await fetch("/api/state", { cache: "no-store" });
     if (!response.ok) throw new Error(`状态接口返回 ${response.status}`);
     const state = await response.json();
     lastState = state;
-    setInputValues(state.defaults);
+    setInputValues(state.defaults, state.parameters);
+    elements.currentTaskLabel.textContent = `Mixing Elbow · ${state.task?.label || "参数研究"}`;
+    const revision = state.task?.conversation_revision ?? 0;
+    if (lastConversationRevision != null && revision !== lastConversationRevision) {
+      clearConversationView();
+    }
+    lastConversationRevision = revision;
     renderStatus(state);
     renderMetrics(state);
     renderCharts(state.trials || []);
     renderTable(state.trials || []);
+    renderDirectRun(state);
     renderAgentState(state);
   } catch (error) {
     elements.mcpDot.className = "status-dot offline";
@@ -336,21 +497,31 @@ async function refresh() {
 }
 
 elements.targetTrials.addEventListener("input", () => { elements.budgetTrials.textContent = elements.targetTrials.value || "—"; });
+elements.parameterSelect.addEventListener("change", () => {
+  applyParameterInputs(elements.parameterSelect.value);
+  renderCharts(lastState?.trials || []);
+  renderTable(lastState?.trials || []);
+  renderMetrics(lastState || { summary: {}, trials: [], job: {}, defaults: {} });
+});
+elements.directParameterSelect.addEventListener("change", () => {
+  applyDirectParameter(elements.directParameterSelect.value);
+});
 
 elements.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   elements.formError.textContent = "";
   if (!elements.form.reportValidity()) return;
-  const velocityMin = Number(elements.velocityMin.value);
-  const velocityMax = Number(elements.velocityMax.value);
-  if (velocityMin >= velocityMax) {
-    elements.formError.textContent = "速度上限必须大于下限";
-    elements.velocityMax.focus();
+  const rangeMin = Number(elements.rangeMin.value);
+  const rangeMax = Number(elements.rangeMax.value);
+  if (rangeMin >= rangeMax) {
+    elements.formError.textContent = "参数上限必须大于下限";
+    elements.rangeMax.focus();
     return;
   }
   const payload = {
     case_file: elements.caseFile.value.trim(), target_trials: Number(elements.targetTrials.value),
-    iterations: Number(elements.iterations.value), velocity_min: velocityMin, velocity_max: velocityMax,
+    iterations: Number(elements.iterations.value), parameter_key: elements.parameterSelect.value,
+    range_min: rangeMin, range_max: rangeMax,
     endpoint: elements.endpoint.value.trim(),
   };
   submitting = true;
@@ -368,6 +539,57 @@ elements.form.addEventListener("submit", async (event) => {
     submitting = false;
     await refresh();
   }
+});
+
+async function submitDirectRun(value, fromAgent = false) {
+  const numericValue = Number(value);
+  const parameter = parameterByKey(elements.directParameterSelect.value);
+  const min = Number(parameter?.hard_min);
+  const max = Number(parameter?.hard_max);
+  if (!Number.isFinite(numericValue) || numericValue < min || numericValue > max) {
+    const message = `${parameter?.label || "参数"}必须在 ${min}–${max} ${parameter?.unit || ""} 之间。`;
+    elements.directError.textContent = message;
+    if (fromAgent) addAgentMessage(message);
+    return false;
+  }
+  const payload = {
+    case_file: elements.caseFile.value.trim(),
+    parameter_key: parameter.key,
+    value: numericValue,
+    iterations: Number(elements.iterations.value),
+    endpoint: elements.endpoint.value.trim(),
+  };
+  directSubmitting = true;
+  elements.directButton.disabled = true;
+  elements.directButtonLabel.textContent = "正在提交";
+  elements.directError.textContent = "";
+  try {
+    const response = await fetch("/api/direct-runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "单点计算启动失败");
+    elements.directValue.value = numericValue;
+    if (fromAgent) addAgentMessage(`已提交${parameter.label} = ${numericValue} ${parameter.unit}。Fluent 将自动计算并返回温度云图。`);
+    switchView("results");
+    await refresh();
+    return true;
+  } catch (error) {
+    elements.directError.textContent = error.message;
+    if (fromAgent) addAgentMessage(`提交失败：${error.message}`);
+    return false;
+  } finally {
+    directSubmitting = false;
+    await refresh();
+  }
+}
+
+elements.directForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!elements.directForm.reportValidity()) return;
+  await submitDirectRun(elements.directValue.value);
 });
 
 function addAgentMessage(text, user = false) {
@@ -388,8 +610,12 @@ function addAgentMessage(text, user = false) {
 
 function plannerReply(question) {
   const trials = validTrials(lastState?.trials || []);
+  const direct = lastState?.direct_run?.result;
   if (/gate|拒绝|失败|发散/i.test(question)) {
     return "Gate 会先检查求解状态与有限值，再核对质量守恒误差。未通过的 Trial 不会进入最优值比较；完整原因保存在 trial_results 与 run_log.jsonl。";
+  }
+  if (/结果|温度|云图/i.test(question) && direct) {
+    return `最近一次单点计算的出口平均温度为 ${formatNumber(direct.objective_value, 3)} K，Fluent 温度云图已显示在“结果与产物”。`;
   }
   if (/最优|结果|温度|trial/i.test(question) && trials.length) {
     return `当前共有 ${trials.length} 个有效 Trial，最佳出口温度为 ${formatNumber(lastState.summary?.best_value, 3)} K。你可以在“结果与产物”查看可审计文件。`;
@@ -397,16 +623,74 @@ function plannerReply(question) {
   return "研究目标已记录。当前版本会把它映射到受控 ExperimentSpec，并要求你在“实验方案”页确认变量、目标和 Gate 后再执行。";
 }
 
-elements.agentForm.addEventListener("submit", (event) => {
+function directParameterFromQuestion(question) {
+  if (!/(设为|改为|改成|调整|提交|计算|运行|云图)/i.test(question)) return null;
+  const aliases = [
+    ["cold_inlet_velocity", /(cold[\s-]*inlet.*速度|冷入口.*速度)/i],
+    ["hot_inlet_velocity", /(hot[\s-]*inlet.*速度|热入口.*速度)/i],
+    ["cold_inlet_temperature", /(cold[\s-]*inlet.*温度|冷入口.*温度)/i],
+    ["hot_inlet_temperature", /(hot[\s-]*inlet.*温度|热入口.*温度)/i],
+    ["outlet_gauge_pressure", /(出口.*表压|出口.*压力|outlet.*pressure)/i],
+    ["cold_inlet_turbulence_intensity", /(冷入口.*湍流强度|cold.*turbulence)/i],
+    ["hot_inlet_turbulence_intensity", /(热入口.*湍流强度|hot.*turbulence)/i],
+    ["cold_inlet_hydraulic_diameter", /(冷入口.*水力直径|cold.*hydraulic)/i],
+    ["hot_inlet_hydraulic_diameter", /(热入口.*水力直径|hot.*hydraulic)/i],
+    ["air_density", /(空气.*密度|air.*density)/i],
+    ["air_viscosity", /(空气.*黏度|空气.*粘度|air.*viscosity)/i],
+    ["air_specific_heat", /(空气.*比热|air.*specific.*heat)/i],
+    ["air_thermal_conductivity", /(空气.*导热|air.*conductivity)/i],
+  ];
+  const selected = aliases.find(([, pattern]) => pattern.test(question));
+  const match = question.match(/(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/i);
+  return selected && match ? { key: selected[0], value: Number(match[1]) } : null;
+}
+
+elements.agentForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const question = elements.agentQuestion.value.trim();
   if (!question) return;
   addAgentMessage(question, true);
   elements.agentQuestion.value = "";
+  const directParameter = directParameterFromQuestion(question);
+  if (directParameter) {
+    applyDirectParameter(directParameter.key, false);
+    await submitDirectRun(directParameter.value, true);
+    return;
+  }
   window.setTimeout(() => addAgentMessage(plannerReply(question)), 220);
 });
 elements.agentQuestion.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); elements.agentForm.requestSubmit(); }
+});
+
+elements.clearConversation.addEventListener("click", async () => {
+  try {
+    const response = await fetch("/api/agent/reset", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "清空对话失败");
+    clearConversationView();
+    lastConversationRevision = result.conversation_revision;
+  } catch (error) {
+    elements.formError.textContent = error.message;
+  }
+});
+
+elements.newTaskButton.addEventListener("click", async () => {
+  elements.formError.textContent = "";
+  try {
+    const response = await fetch("/api/tasks/new", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "新建任务失败");
+    initialized = false;
+    parameterCatalog = [];
+    selectedParameterKey = "cold_inlet_velocity";
+    lastState = null;
+    clearConversationView();
+    switchView("model");
+    await refresh();
+  } catch (error) {
+    elements.formError.textContent = error.message;
+  }
 });
 
 $("#accept-suggestion").addEventListener("click", () => switchView("plan"));

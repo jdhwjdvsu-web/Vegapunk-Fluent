@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_id": "20260831T094343293903Z",
+  "status": "SUCCEEDED",
+  "classification": "out_of_baseline_range",
+  "started_at": "2026-08-31T09:43:44.480285+00:00",
+  "completed_at": "2026-08-31T09:44:31.724551+00:00",
+  "elapsed_seconds": 46.447923856998386,
+  "parameters": {
+    "cold_inlet_velocity": 10.0
+  },
+  "iterations_requested": 200,
+  "residuals": {
+    "iteration": 75,
+    "values": {
+      "continuity": 0.00091353,
+      "x-velocity": 5.7304e-07,
+      "y-velocity": 1.1115e-06,
+      "z-velocity": 4.6609e-07,
+      "energy": 1.234e-08,
+      "k": 1.0515e-05,
+      "omega": 7.7745e-06
+    }
+  },
+  "reports": {
+    "mass-flow-in": {
+      "value": 0.04801784838084182,
+      "unit": "kg/s"
+    },
+    "outlet-temp-avg": {
+      "value": 293.2969778351439,
+      "unit": "K"
+    },
+    "mass-flow-out": {
+      "value": -0.04801793122890051,
+      "unit": "kg/s"
+    }
+  },
+  "objective_value": 293.2969778351439,
+  "objective_unit": "K",
+  "mass_balance_relative_error": 1.7253596628090906e-06,
+  "mass_balance_gate_limit": 0.001,
+  "mass_balance_gate_passed": true,
+  "surface": "symmetry-xyplane",
+  "image_url": "/api/direct-runs/20260831T094343293903Z/temperature-contour.png",
+  "artifacts": {
+    "summary": "/mnt/d/Vegapunk-Fluent/runs/fluent_v1_acceptance_20260831/fixed20_campaign/direct_runs/20260831T094343293903Z/summary.json",
+    "temperature_contour": "/mnt/d/Vegapunk-Fluent/runs/fluent_v1_acceptance_20260831/fixed20_campaign/direct_runs/20260831T094343293903Z/temperature_contour.png",
+    "generated_code": "/mnt/d/Vegapunk-Fluent/runs/fluent_v1_acceptance_20260831/fixed20_campaign/direct_runs/20260831T094343293903Z/generated_code.py",
+    "solver_stdout": "/mnt/d/Vegapunk-Fluent/runs/fluent_v1_acceptance_20260831/fixed20_campaign/direct_runs/20260831T094343293903Z/solver_stdout.log"
+  }
+}

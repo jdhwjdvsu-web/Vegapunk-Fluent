@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "campaign_id": "autofluentoptunademov01-d571931609fe",
+  "trial_id": "trial-0002",
+  "state": "TOLD",
+  "attempt": 0,
+  "job_id": "job-5411f70e756cc8af29d8",
+  "parameters": {
+    "cold_inlet_velocity": 1.0792306233942424
+  },
+  "result": {
+    "name": "trial-0002",
+    "status": "completed",
+    "parameters": {
+      "cold_inlet_velocity": 1.0792306233942424
+    },
+    "objective_value": 294.2847172504713,
+    "objective_unit": "K",
+    "reports": {
+      "mass-flow-out": {
+        "value": -0.005491853469105991,
+        "unit": "kg/s"
+      },
+      "mass-flow-in": {
+        "value": 0.005491852469950254,
+        "unit": "kg/s"
+      },
+      "outlet-temp-avg": {
+        "value": 294.2847172504713,
+        "unit": "K"
+      }
+    },
+    "residuals": {
+      "iteration": 89,
+      "values": {
+        "continuity": 0.00096679,
+        "x-velocity": 6.1313e-07,
+        "y-velocity": 1.4166e-06,
+        "z-velocity": 4.9554e-07,
+        "energy": 1.6446e-08,
+        "k": 1.6257e-05,
+        "omega": 9.7485e-06
+      }
+    },
+    "convergence": {
+      "required": false,
+      "passed": null,
+      "checks": []
+    },
+    "constraints": [],
+    "monitor_history": {},
+    "iterations_requested": 100,
+    "elapsed_seconds": 17.51841369998874,
+    "baseline_reloaded": true,
+    "error": null,
+    "mass_flow_in": 0.005491852469950254,
+    "mass_flow_out": 0.005491853469105991,
+    "mass_flow_unit": "kg/s"
+  },
+  "gate": {
+    "passed": true,
+    "status": "PASS",
+    "checks": [
+      {
+        "name": "solver_status",
+        "passed": true
+      },
+      {
+        "name": "finite_objective_value",
+        "passed": true,
+        "value": 294.2847172504713
+      },
+      {
+        "name": "finite_mass_flow_in",
+        "passed": true,
+        "value": 0.005491852469950254
+      },
+      {
+        "name": "finite_mass_flow_out",
+        "passed": true,
+        "value": 0.005491853469105991
+      },
+      {
+        "name": "mass_balance",
+        "passed": true,
+        "relative_error": 1.8193415794262825e-07,
+        "tolerance": 0.001
+      }
+    ],
+    "reasons": [],
+    "metrics": {
+      "mass_balance_relative_error": 1.8193415794262825e-07
+    },
+    "constraint_vector": []
+  },
+  "created_at": "2026-08-30T16:13:25.245237+00:00",
+  "updated_at": "2026-08-30T16:14:03.773522+00:00"
+}

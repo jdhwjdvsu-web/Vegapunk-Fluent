@@ -1,0 +1,16 @@
+__vp_report_defs = solver.settings.solution.report_definitions
+__vp_collection = __vp_report_defs.surface
+__vp_collection['outlet-temp-avg'] = {}
+__vp_report = __vp_collection['outlet-temp-avg']
+__vp_report.report_type = 'surface-areaavg'
+__vp_report.field = 'temperature'
+__vp_report.surface_names = ['outlet']
+__vp_collection = __vp_report_defs.flux
+__vp_collection['mass-flow-in'] = {}
+__vp_report = __vp_collection['mass-flow-in']
+__vp_report.boundaries = ['cold-inlet', 'hot-inlet']
+__vp_collection = __vp_report_defs.flux
+__vp_collection['mass-flow-out'] = {}
+__vp_report = __vp_collection['mass-flow-out']
+__vp_report.boundaries = ['outlet']
+print('VEGAPUNK_FLUENT_SETUP=ok')

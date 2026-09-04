@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "classification": "out_of_baseline_range",
+    "label": "cold-inlet-10mps-anomaly",
+    "authorized_velocity_m_per_s": 10.0
+  },
+  "job": {
+    "job_id": "job-7153de29137ecdb98ec7",
+    "campaign_id": "manual-high-velocity-10ms-20260831",
+    "trial_id": "anomaly-cold-inlet-10ms",
+    "state": "SUCCEEDED",
+    "baseline_reloaded": true,
+    "baseline_sha256": "8145813f50f989a521ed8d1b02c891c7ca22ccc5fafa35a4eeba011949f19cbc",
+    "iterations_requested": 200,
+    "last_reported_iteration": 75,
+    "elapsed_seconds": 21.676801400026307
+  },
+  "results": {
+    "outlet_temperature_area_average": {
+      "value": 293.2969778351439,
+      "unit": "K"
+    },
+    "mass_flow_in": {
+      "value": 0.04801784838084182,
+      "unit": "kg/s"
+    },
+    "mass_flow_out": {
+      "value": 0.04801793122890051,
+      "unit": "kg/s"
+    },
+    "relative_mass_balance_error": 1.7253596628090906e-06,
+    "mass_balance_gate_limit": 0.001,
+    "mass_balance_gate_passed": true
+  },
+  "artifacts": {
+    "temperature_contour": "temperature_contour_cold_inlet_10ms.png",
+    "contour_generation_code": "temperature_contour_cold_inlet_10ms.py",
+    "experiment_spec": "../../config/fluent/mixing_elbow.high-velocity-10ms.json"
+  }
+}

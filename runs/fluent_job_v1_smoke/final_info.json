@@ -1,0 +1,17 @@
+{
+  "fluent_optimization": {
+    "means": {
+      "objective_score": -294.7843406982414,
+      "completed_trial_rate": 1.0
+    },
+    "campaign_id": "autofluentoptunademov01-d571931609fe",
+    "best_trial": {
+      "trial_number": 0,
+      "parameters": {
+        "cold_inlet_velocity": 0.6621780831931539
+      },
+      "objective_value": 294.7843406982414
+    },
+    "artifact": "optimization_summary.json"
+  }
+}

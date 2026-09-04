@@ -1,0 +1,88 @@
+{
+  "trial_id": "controller-restart",
+  "result": {
+    "name": "controller-restart",
+    "status": "completed",
+    "parameters": {
+      "cold_inlet_velocity": 0.77
+    },
+    "objective_value": 294.610954896345,
+    "objective_unit": "K",
+    "reports": {
+      "mass-flow-out": {
+        "value": -0.004017729749488009,
+        "unit": "kg/s"
+      },
+      "mass-flow-in": {
+        "value": 0.004017726229171957,
+        "unit": "kg/s"
+      },
+      "outlet-temp-avg": {
+        "value": 294.610954896345,
+        "unit": "K"
+      }
+    },
+    "residuals": {
+      "iteration": 100,
+      "values": {
+        "continuity": 0.0015208,
+        "x-velocity": 7.662e-07,
+        "y-velocity": 2.2279e-06,
+        "z-velocity": 7.0852e-07,
+        "energy": 8.5314e-09,
+        "k": 2.633e-05,
+        "omega": 1.1729e-05
+      }
+    },
+    "convergence": {
+      "required": false,
+      "passed": null,
+      "checks": []
+    },
+    "constraints": [],
+    "monitor_history": {},
+    "iterations_requested": 100,
+    "elapsed_seconds": 17.726222899975255,
+    "baseline_reloaded": true,
+    "error": null,
+    "mass_flow_in": 0.004017726229171957,
+    "mass_flow_out": 0.004017729749488009,
+    "mass_flow_unit": "kg/s"
+  },
+  "gate": {
+    "passed": true,
+    "status": "PASS",
+    "checks": [
+      {
+        "name": "solver_status",
+        "passed": true
+      },
+      {
+        "name": "finite_objective_value",
+        "passed": true,
+        "value": 294.610954896345
+      },
+      {
+        "name": "finite_mass_flow_in",
+        "passed": true,
+        "value": 0.004017726229171957
+      },
+      {
+        "name": "finite_mass_flow_out",
+        "passed": true,
+        "value": 0.004017729749488009
+      },
+      {
+        "name": "mass_balance",
+        "passed": true,
+        "relative_error": 8.761953322023964e-07,
+        "tolerance": 0.001
+      }
+    ],
+    "reasons": [],
+    "metrics": {
+      "mass_balance_relative_error": 8.761953322023964e-07
+    },
+    "constraint_vector": []
+  }
+}

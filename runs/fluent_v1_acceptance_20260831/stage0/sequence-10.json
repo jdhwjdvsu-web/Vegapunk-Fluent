@@ -1,0 +1,874 @@
+{
+  "results": [
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 17.361346299992874,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 1,
+      "started_at": "2026-08-30T16:07:44.239023+00:00",
+      "completed_at": "2026-08-30T16:08:01.600387+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 680.06640625,
+        "cortex_pid": 900.48046875
+      },
+      "process_memory_mb": 1580.546875,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 16.8509558000369,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 2,
+      "started_at": "2026-08-30T16:08:01.601742+00:00",
+      "completed_at": "2026-08-30T16:08:18.452705+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 680.390625,
+        "cortex_pid": 901.56640625
+      },
+      "process_memory_mb": 1581.95703125,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 16.981464799959213,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 3,
+      "started_at": "2026-08-30T16:08:18.453370+00:00",
+      "completed_at": "2026-08-30T16:08:35.434841+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 681.1640625,
+        "cortex_pid": 902.0546875
+      },
+      "process_memory_mb": 1583.21875,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 27.32986499997787,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 4,
+      "started_at": "2026-08-30T16:08:35.435481+00:00",
+      "completed_at": "2026-08-30T16:09:02.765352+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 681.94140625,
+        "cortex_pid": 903.21875
+      },
+      "process_memory_mb": 1585.16015625,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 16.986180100007914,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 5,
+      "started_at": "2026-08-30T16:09:02.765977+00:00",
+      "completed_at": "2026-08-30T16:09:19.752163+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 681.4765625,
+        "cortex_pid": 904.09375
+      },
+      "process_memory_mb": 1585.5703125,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 16.955853799998295,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 6,
+      "started_at": "2026-08-30T16:09:19.752798+00:00",
+      "completed_at": "2026-08-30T16:09:36.708658+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 681.69921875,
+        "cortex_pid": 905.58984375
+      },
+      "process_memory_mb": 1587.2890625,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 16.832320699992124,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 7,
+      "started_at": "2026-08-30T16:09:36.709295+00:00",
+      "completed_at": "2026-08-30T16:09:53.541622+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 681.92578125,
+        "cortex_pid": 906.3125
+      },
+      "process_memory_mb": 1588.23828125,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 27.22792610002216,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 8,
+      "started_at": "2026-08-30T16:09:53.542276+00:00",
+      "completed_at": "2026-08-30T16:10:20.770209+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 682.10546875,
+        "cortex_pid": 907.296875
+      },
+      "process_memory_mb": 1589.40234375,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 17.0664523000014,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 9,
+      "started_at": "2026-08-30T16:10:20.770853+00:00",
+      "completed_at": "2026-08-30T16:10:37.837311+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 681.85546875,
+        "cortex_pid": 908.11328125
+      },
+      "process_memory_mb": 1589.96875,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    },
+    {
+      "status": "completed",
+      "parameters": {
+        "cold_inlet_velocity": 0.55
+      },
+      "objective_value": 295.0364218442149,
+      "objective_unit": "K",
+      "reports": {
+        "mass-flow-out": {
+          "value": -0.002968970821264707,
+          "unit": "kg/s"
+        },
+        "mass-flow-in": {
+          "value": 0.002968969254809296,
+          "unit": "kg/s"
+        },
+        "outlet-temp-avg": {
+          "value": 295.0364218442149,
+          "unit": "K"
+        }
+      },
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0029357,
+          "x-velocity": 1.5896e-06,
+          "y-velocity": 4.7928e-06,
+          "z-velocity": 1.4521e-06,
+          "energy": 2.7502e-08,
+          "k": 3.7947e-05,
+          "omega": 2.1659e-05
+        }
+      },
+      "elapsed_seconds": 17.108079400029965,
+      "baseline_reloaded": true,
+      "phase": "sequence",
+      "run_index": 10,
+      "started_at": "2026-08-30T16:10:37.837928+00:00",
+      "completed_at": "2026-08-30T16:10:54.946014+00:00",
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "process_working_set_mb": {
+        "fluent_host_pid": 681.953125,
+        "cortex_pid": 909.0859375
+      },
+      "process_memory_mb": 1591.0390625,
+      "mass_flow_in": 0.002968969254809296,
+      "mass_flow_out": 0.002968970821264707,
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 295.0364218442149
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.002968969254809296
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.002968970821264707
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 5.276088937881344e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 5.276088937881344e-07
+        },
+        "constraint_vector": []
+      }
+    }
+  ]
+}

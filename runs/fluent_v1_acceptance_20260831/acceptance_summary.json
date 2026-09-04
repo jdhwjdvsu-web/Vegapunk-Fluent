@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "expected_points": 20,
+  "observed_points": 20,
+  "missing": [],
+  "duplicate_scenarios": [],
+  "duplicate_computations": [],
+  "nonterminal": [],
+  "invalid_selected_as_best": [],
+  "inconsistent_artifacts": [],
+  "generated_at": "2026-08-30T16:35:12.494110+00:00"
+}

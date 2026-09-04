@@ -1,0 +1,241 @@
+{
+  "parameter-out-of-range": {
+    "submitted_to_mcp": false,
+    "gate": {
+      "passed": false,
+      "status": "PARAMETER",
+      "checks": [
+        {
+          "name": "cold_inlet_velocity",
+          "passed": false,
+          "value": 1.2000000000000002
+        }
+      ],
+      "reasons": [
+        "parameters.cold_inlet_velocity=1.2000000000000002 exceeds maximum 1.1"
+      ],
+      "metrics": {},
+      "constraint_vector": []
+    }
+  },
+  "mass-balance-failure": {
+    "fixture": {
+      "mass_flow_in": 0.003368565884024937,
+      "mass_flow_out": 0.004042279060829925
+    },
+    "gate": {
+      "passed": false,
+      "status": "DIVERGED",
+      "checks": [
+        {
+          "name": "solver_status",
+          "passed": true
+        },
+        {
+          "name": "finite_objective_value",
+          "passed": true,
+          "value": 294.8389477144763
+        },
+        {
+          "name": "finite_mass_flow_in",
+          "passed": true,
+          "value": 0.003368565884024937
+        },
+        {
+          "name": "finite_mass_flow_out",
+          "passed": true,
+          "value": 0.004042279060829925
+        },
+        {
+          "name": "mass_balance",
+          "passed": false,
+          "relative_error": 0.1666666666666667,
+          "tolerance": 0.001
+        }
+      ],
+      "reasons": [
+        "mass balance relative error 0.166667 exceeds 0.001"
+      ],
+      "metrics": {
+        "mass_balance_relative_error": 0.1666666666666667
+      },
+      "constraint_vector": []
+    }
+  },
+  "numerical-divergence": {
+    "fixture": {
+      "status": "solver_error"
+    },
+    "gate": {
+      "passed": false,
+      "status": "DIVERGED",
+      "checks": [
+        {
+          "name": "solver_status",
+          "passed": false
+        },
+        {
+          "name": "finite_objective_value",
+          "passed": true,
+          "value": 294.8389477144763
+        },
+        {
+          "name": "finite_mass_flow_in",
+          "passed": true,
+          "value": 0.003368565884024937
+        },
+        {
+          "name": "finite_mass_flow_out",
+          "passed": true,
+          "value": 0.003368568432055643
+        },
+        {
+          "name": "mass_balance",
+          "passed": true,
+          "relative_error": 7.564135203210601e-07,
+          "tolerance": 0.001
+        }
+      ],
+      "reasons": [
+        "solver status is 'solver_error'"
+      ],
+      "metrics": {
+        "mass_balance_relative_error": 7.564135203210601e-07
+      },
+      "constraint_vector": []
+    }
+  },
+  "trial-timeout": {
+    "submitted": {
+      "job_id": "job-246fc1c7c399164a4e53",
+      "state": "CREATED",
+      "created": true,
+      "idempotent": false
+    },
+    "status": {
+      "schema_version": 1,
+      "job_id": "job-246fc1c7c399164a4e53",
+      "identity": "autofluentacceptancefaults-v01:trial-timeout:0",
+      "payload_sha256": "bc43267f1a3bdc0a2507154a3c51a17c17b57f9f9ac95801c0901f61097b40d1",
+      "state": "ORPHANED",
+      "job_spec": {
+        "campaign_id": "autofluentacceptancefaults-v01",
+        "trial_id": "trial-timeout",
+        "attempt_id": 0,
+        "idempotency_key": "autofluentacceptancefaults-v01:trial-timeout:0",
+        "session_id": "autofluentacceptancefaults-v01",
+        "parameters": {
+          "cold_inlet_velocity": 0.75
+        },
+        "baseline_fingerprint": "b1970dc16eeaa2b9562bc972569e97ab3e22503689ab49e251fdfcbc77ddeeae",
+        "timeout": 0.05,
+        "experiment_spec": {
+          "schema_version": 1,
+          "task_name": "AutoFluentAcceptanceV01",
+          "connection": {
+            "endpoint": "http://127.0.0.1:18000/mcp",
+            "job_endpoint": null,
+            "baseline_sha256": "8145813f50f989a521ed8d1b02c891c7ca22ccc5fafa35a4eeba011949f19cbc",
+            "connect_kwargs": {
+              "ui_mode": "no_gui",
+              "precision": "double",
+              "processor_count": 2,
+              "dimension": 3,
+              "case_file_name": "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\vegapunk-fluent-feasibility\\mixing_elbow.cas.h5",
+              "start_timeout": 180,
+              "cleanup_on_exit": true
+            },
+            "client_timeout_seconds": 600,
+            "allow_remote_endpoint": false,
+            "reuse_existing_session": false,
+            "disconnect_on_exit": true
+          },
+          "solver": {
+            "initialization": "hybrid",
+            "iterations": 100,
+            "residual_thresholds": {}
+          },
+          "parameters": [
+            {
+              "name": "cold_inlet_velocity",
+              "collection_path": "setup.boundary_conditions.velocity_inlet",
+              "object_name": "cold-inlet",
+              "property_path": "momentum.velocity_magnitude.value",
+              "unit": "m/s",
+              "minimum": 0.4,
+              "maximum": 1.1,
+              "step": null,
+              "log": false
+            }
+          ],
+          "reports": [
+            {
+              "name": "outlet-temp-avg",
+              "kind": "surface",
+              "locations": [
+                "outlet"
+              ],
+              "report_type": "surface-areaavg",
+              "field_name": "temperature"
+            },
+            {
+              "name": "mass-flow-in",
+              "kind": "flux",
+              "locations": [
+                "cold-inlet",
+                "hot-inlet"
+              ],
+              "report_type": null,
+              "field_name": null
+            },
+            {
+              "name": "mass-flow-out",
+              "kind": "flux",
+              "locations": [
+                "outlet"
+              ],
+              "report_type": null,
+              "field_name": null
+            }
+          ],
+          "design_points": [
+            {
+              "name": "baseline",
+              "values": {
+                "cold_inlet_velocity": 0.55
+              }
+            }
+          ],
+          "objective": {
+            "report": "outlet-temp-avg",
+            "direction": "minimize"
+          },
+          "parameter_constraints": [],
+          "constraints": [],
+          "optimization": {
+            "study_name": "fluent_acceptance_v01",
+            "target_trials": 13,
+            "sampler_seed": 20260831,
+            "n_startup_trials": 4,
+            "mass_flow_in_report": "mass-flow-in",
+            "mass_flow_out_report": "mass-flow-out",
+            "mass_balance_relative_tolerance": 0.001,
+            "mass_balance_epsilon": 1e-12,
+            "verify_invalid_parameter_gate": true,
+            "max_attempts_per_trial": 2,
+            "heartbeat_seconds": 2.0,
+            "trial_timeout_seconds": 3600.0,
+            "conservation_checks": [],
+            "numerical_monitors": []
+          }
+        }
+      },
+      "created_at": "2026-08-30T16:27:13.728573+00:00",
+      "updated_at": "2026-08-30T16:27:13.819376+00:00",
+      "started_at": "2026-08-30T16:27:13.744929+00:00",
+      "finished_at": "2026-08-30T16:27:13.819376+00:00",
+      "error": "Job exceeded timeout of 0.05 seconds",
+      "retry_safe": false
+    }
+  }
+}

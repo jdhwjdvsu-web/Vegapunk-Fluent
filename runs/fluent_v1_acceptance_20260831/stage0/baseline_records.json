@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "tolerances": {
+    "outlet_temperature": 0.001,
+    "mass_flow_in": 0.001,
+    "mass_flow_out": 0.001,
+    "mass_balance_relative_error": 0.01
+  },
+  "records": [
+    {
+      "phase": "cold",
+      "run_index": 1,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 17.38061299995752,
+      "process_memory_mb": 1580.8515625,
+      "process_ids": {
+        "fluent_host_pid": 12260,
+        "cortex_pid": 4076
+      },
+      "started_at": "2026-08-30T16:05:06.801413+00:00",
+      "completed_at": "2026-08-30T16:05:24.182045+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "cold",
+      "run_index": 2,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 17.298498899966944,
+      "process_memory_mb": 1581.39453125,
+      "process_ids": {
+        "fluent_host_pid": 39712,
+        "cortex_pid": 40988
+      },
+      "started_at": "2026-08-30T16:05:44.257407+00:00",
+      "completed_at": "2026-08-30T16:06:01.555922+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "cold",
+      "run_index": 3,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 17.317424200009555,
+      "process_memory_mb": 1581.0390625,
+      "process_ids": {
+        "fluent_host_pid": 44912,
+        "cortex_pid": 37624
+      },
+      "started_at": "2026-08-30T16:06:31.697283+00:00",
+      "completed_at": "2026-08-30T16:06:49.014723+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 1,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 17.361346299992874,
+      "process_memory_mb": 1580.546875,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:07:44.239023+00:00",
+      "completed_at": "2026-08-30T16:08:01.600387+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 2,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 16.8509558000369,
+      "process_memory_mb": 1581.95703125,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:08:01.601742+00:00",
+      "completed_at": "2026-08-30T16:08:18.452705+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 3,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 16.981464799959213,
+      "process_memory_mb": 1583.21875,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:08:18.453370+00:00",
+      "completed_at": "2026-08-30T16:08:35.434841+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 4,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 27.32986499997787,
+      "process_memory_mb": 1585.16015625,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:08:35.435481+00:00",
+      "completed_at": "2026-08-30T16:09:02.765352+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 5,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 16.986180100007914,
+      "process_memory_mb": 1585.5703125,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:09:02.765977+00:00",
+      "completed_at": "2026-08-30T16:09:19.752163+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 6,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 16.955853799998295,
+      "process_memory_mb": 1587.2890625,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:09:19.752798+00:00",
+      "completed_at": "2026-08-30T16:09:36.708658+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 7,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 16.832320699992124,
+      "process_memory_mb": 1588.23828125,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:09:36.709295+00:00",
+      "completed_at": "2026-08-30T16:09:53.541622+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 8,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 27.22792610002216,
+      "process_memory_mb": 1589.40234375,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:09:53.542276+00:00",
+      "completed_at": "2026-08-30T16:10:20.770209+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 9,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 17.0664523000014,
+      "process_memory_mb": 1589.96875,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:10:20.770853+00:00",
+      "completed_at": "2026-08-30T16:10:37.837311+00:00",
+      "baseline_reloaded": true
+    },
+    {
+      "phase": "sequence",
+      "run_index": 10,
+      "metrics": {
+        "outlet_temperature": 295.0364218442149,
+        "mass_flow_in": 0.002968969254809296,
+        "mass_flow_out": 0.002968970821264707,
+        "mass_balance_relative_error": 5.276091721594261e-07
+      },
+      "elapsed_seconds": 17.108079400029965,
+      "process_memory_mb": 1591.0390625,
+      "process_ids": {
+        "fluent_host_pid": 32624,
+        "cortex_pid": 43688
+      },
+      "started_at": "2026-08-30T16:10:37.837928+00:00",
+      "completed_at": "2026-08-30T16:10:54.946014+00:00",
+      "baseline_reloaded": true
+    }
+  ]
+}

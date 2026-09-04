@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+  "campaign_fingerprint": "9e07d955ed25a4a035cd3d202cfa94b0b603ca2be64c9dce1f9535d9e7c46596",
+  "parent_campaign_id": null,
+  "best_trial": {
+    "trial_number": 6,
+    "parameters": {
+      "cold_inlet_velocity": 1.0995201301007693
+    },
+    "objective_value": 294.2687028549982
+  },
+  "completed": 13,
+  "failed": 0,
+  "retried": 0,
+  "failure_statistics": {},
+  "constraint_statistics": {
+    "PASS": 13
+  },
+  "convergence_trend": [
+    {
+      "trial_number": 0,
+      "objective_value": 294.8389477144763,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 1,
+      "objective_value": 294.867400687448,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 2,
+      "objective_value": 294.4799522739248,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 3,
+      "objective_value": 295.0693162636146,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 4,
+      "objective_value": 294.2697562159297,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 5,
+      "objective_value": 294.3103873633829,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 6,
+      "objective_value": 294.2687028549982,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 7,
+      "objective_value": 295.575951870755,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 8,
+      "objective_value": 294.45698480378,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 9,
+      "objective_value": 294.5596713554033,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 10,
+      "objective_value": 294.6543968357815,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 11,
+      "objective_value": 294.2754142031859,
+      "gate": "PASS"
+    },
+    {
+      "trial_number": 12,
+      "objective_value": 294.356629947194,
+      "gate": "PASS"
+    }
+  ],
+  "numerical_uncertainty": null,
+  "runtime": {
+    "mean_trial_seconds": 17.601817261530623,
+    "total_trial_seconds": 228.8236243998981
+  },
+  "updated_at": "2026-08-30T16:25:07.406834+00:00"
+}

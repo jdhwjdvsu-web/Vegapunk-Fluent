@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "metric_checks": [
+    {
+      "metric": "outlet_temperature",
+      "samples": 13,
+      "mean": 295.0364218442149,
+      "minimum": 295.0364218442149,
+      "maximum": 295.0364218442149,
+      "relative_spread": 0.0,
+      "tolerance": 0.001,
+      "passed": true
+    },
+    {
+      "metric": "mass_flow_in",
+      "samples": 13,
+      "mean": 0.002968969254809296,
+      "minimum": 0.002968969254809296,
+      "maximum": 0.002968969254809296,
+      "relative_spread": 0.0,
+      "tolerance": 0.001,
+      "passed": true
+    },
+    {
+      "metric": "mass_flow_out",
+      "samples": 13,
+      "mean": 0.0029689708212647073,
+      "minimum": 0.002968970821264707,
+      "maximum": 0.002968970821264707,
+      "relative_spread": 0.0,
+      "tolerance": 0.001,
+      "passed": true
+    },
+    {
+      "metric": "mass_balance_relative_error",
+      "samples": 13,
+      "mean": 5.276091721594261e-07,
+      "minimum": 5.276091721594261e-07,
+      "maximum": 5.276091721594261e-07,
+      "relative_spread": 0.0,
+      "tolerance": 0.01,
+      "passed": true
+    }
+  ],
+  "readiness": {
+    "cold_runs": 3,
+    "sequence_runs": 10,
+    "cold_run_count_passed": true,
+    "sequence_run_count_passed": true,
+    "memory_growth_fraction": 0.006638327319460235,
+    "memory_growth_tolerance": 0.1,
+    "memory_growth_passed": true
+  },
+  "generated_at": "2026-08-30T16:11:43.956770+00:00"
+}

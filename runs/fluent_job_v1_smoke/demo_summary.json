@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "study_name": "fluent_demo_v01",
+  "target_completed_trials": 1,
+  "completed_trials": 1,
+  "state_counts": {
+    "COMPLETE": 1
+  },
+  "best_trial_number": 0,
+  "best_params": {
+    "cold_inlet_velocity": 0.6621780831931539
+  },
+  "best_value": 294.7843406982414,
+  "gate_counts": {
+    "PASS": 1
+  },
+  "mean_trial_seconds": 24.875604500004556,
+  "total_trial_seconds": 24.875604500004556,
+  "convergence_trend": [
+    {
+      "trial_number": 0,
+      "objective_value": 294.7843406982414,
+      "gate": "PASS"
+    }
+  ],
+  "trials": [
+    {
+      "schema_version": 1,
+      "trial_number": 0,
+      "sampling_phase": "startup_random",
+      "started_at": "2026-08-30T13:27:45.435231+00:00",
+      "completed_at": "2026-08-30T13:28:48.648875+00:00",
+      "parameters": {
+        "cold_inlet_velocity": 0.6621780831931539
+      },
+      "objective_value": 294.7843406982414,
+      "objective_unit": "K",
+      "mass_flow_in": 0.003503730832624997,
+      "mass_flow_out": 0.003503736332877426,
+      "mass_flow_unit": "kg/s",
+      "gates": {
+        "passed": true,
+        "status": "PASS",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 294.7843406982414
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.003503730832624997
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.003503736332877426
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 1.5698248687406342e-06,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [],
+        "metrics": {
+          "mass_balance_relative_error": 1.5698248687406342e-06
+        },
+        "constraint_vector": []
+      },
+      "duration_seconds": 24.875604500004556,
+      "iterations_requested": 100,
+      "residuals": {
+        "iteration": 100,
+        "values": {
+          "continuity": 0.0021235,
+          "x-velocity": 1.1296e-06,
+          "y-velocity": 3.378e-06,
+          "z-velocity": 1.0441e-06,
+          "energy": 1.4881e-08,
+          "k": 3.5029e-05,
+          "omega": 1.6656e-05
+        }
+      },
+      "reports": {
+        "outlet-temp-avg": {
+          "value": 294.7843406982414,
+          "unit": "K"
+        },
+        "mass-flow-in": {
+          "value": 0.003503730832624997,
+          "unit": "kg/s"
+        },
+        "mass-flow-out": {
+          "value": -0.003503736332877426,
+          "unit": "kg/s"
+        }
+      },
+      "baseline_reloaded": true,
+      "state": "PASS"
+    }
+  ],
+  "sqlite_path": "/mnt/d/Vegapunk-Fluent/runs/fluent_job_v1_smoke/study.sqlite3",
+  "jsonl_path": "/mnt/d/Vegapunk-Fluent/runs/fluent_job_v1_smoke/run_log.jsonl",
+  "updated_at": "2026-08-30T13:28:48.824361+00:00"
+}

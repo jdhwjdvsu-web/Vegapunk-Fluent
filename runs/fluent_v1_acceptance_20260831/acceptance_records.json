@@ -1,0 +1,379 @@
+[
+  {
+    "scenario_id": "normal-01",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0000",
+    "job_id": "job-118dd246bfd559857f70",
+    "objective_value": 294.8389477144763
+  },
+  {
+    "scenario_id": "normal-02",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0001",
+    "job_id": "job-1c23c84603a374a1c63b",
+    "objective_value": 294.867400687448
+  },
+  {
+    "scenario_id": "normal-03",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0002",
+    "job_id": "job-7d89942a08e7d7d52d20",
+    "objective_value": 294.4799522739248
+  },
+  {
+    "scenario_id": "normal-04",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0003",
+    "job_id": "job-09b8ab38bba30072b386",
+    "objective_value": 295.0693162636146
+  },
+  {
+    "scenario_id": "normal-05",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0004",
+    "job_id": "job-de5bf817d1b6392cd07e",
+    "objective_value": 294.2697562159297
+  },
+  {
+    "scenario_id": "normal-06",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0005",
+    "job_id": "job-af6711616c9ef88685b1",
+    "objective_value": 294.3103873633829
+  },
+  {
+    "scenario_id": "normal-07",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": true,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0006",
+    "job_id": "job-ba39562283b1b29d60d8",
+    "objective_value": 294.2687028549982
+  },
+  {
+    "scenario_id": "normal-08",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0007",
+    "job_id": "job-6298ab1bde35331943bd",
+    "objective_value": 295.575951870755
+  },
+  {
+    "scenario_id": "normal-09",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0008",
+    "job_id": "job-728b165c07972d67b6e0",
+    "objective_value": 294.45698480378
+  },
+  {
+    "scenario_id": "normal-10",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0009",
+    "job_id": "job-5f748dc5a0267469740e",
+    "objective_value": 294.5596713554033
+  },
+  {
+    "scenario_id": "normal-11",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0010",
+    "job_id": "job-3b14b58febb0d1ee2216",
+    "objective_value": 294.6543968357815
+  },
+  {
+    "scenario_id": "normal-12",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0011",
+    "job_id": "job-6af9b8283ee590b574bb",
+    "objective_value": 294.2754142031859
+  },
+  {
+    "scenario_id": "normal-13",
+    "injection": "none",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "campaign_id": "autofluentacceptancev01-9e07d955ed25",
+    "trial_id": "trial-0012",
+    "job_id": "job-19e3e9ed5cc7aa3d8dd4",
+    "objective_value": 294.356629947194
+  },
+  {
+    "scenario_id": "parameter-out-of-range",
+    "injection": "parameter_gate",
+    "state": "FAILED",
+    "gate_status": "PARAMETER",
+    "selected_as_best": false,
+    "fluent_execution_count": 0,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "evidence": {
+      "submitted_to_mcp": false,
+      "gate": {
+        "passed": false,
+        "status": "PARAMETER",
+        "checks": [
+          {
+            "name": "cold_inlet_velocity",
+            "passed": false,
+            "value": 1.2000000000000002
+          }
+        ],
+        "reasons": [
+          "parameters.cold_inlet_velocity=1.2000000000000002 exceeds maximum 1.1"
+        ],
+        "metrics": {},
+        "constraint_vector": []
+      }
+    }
+  },
+  {
+    "scenario_id": "mass-balance-failure",
+    "injection": "result_fixture",
+    "state": "FAILED",
+    "gate_status": "DIVERGED",
+    "selected_as_best": false,
+    "fluent_execution_count": 0,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "evidence": {
+      "fixture": {
+        "mass_flow_in": 0.003368565884024937,
+        "mass_flow_out": 0.004042279060829925
+      },
+      "gate": {
+        "passed": false,
+        "status": "DIVERGED",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": true
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 294.8389477144763
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.003368565884024937
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.004042279060829925
+          },
+          {
+            "name": "mass_balance",
+            "passed": false,
+            "relative_error": 0.1666666666666667,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [
+          "mass balance relative error 0.166667 exceeds 0.001"
+        ],
+        "metrics": {
+          "mass_balance_relative_error": 0.1666666666666667
+        },
+        "constraint_vector": []
+      }
+    }
+  },
+  {
+    "scenario_id": "numerical-divergence",
+    "injection": "result_fixture",
+    "state": "FAILED",
+    "gate_status": "DIVERGED",
+    "selected_as_best": false,
+    "fluent_execution_count": 0,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "evidence": {
+      "fixture": {
+        "status": "solver_error"
+      },
+      "gate": {
+        "passed": false,
+        "status": "DIVERGED",
+        "checks": [
+          {
+            "name": "solver_status",
+            "passed": false
+          },
+          {
+            "name": "finite_objective_value",
+            "passed": true,
+            "value": 294.8389477144763
+          },
+          {
+            "name": "finite_mass_flow_in",
+            "passed": true,
+            "value": 0.003368565884024937
+          },
+          {
+            "name": "finite_mass_flow_out",
+            "passed": true,
+            "value": 0.003368568432055643
+          },
+          {
+            "name": "mass_balance",
+            "passed": true,
+            "relative_error": 7.564135203210601e-07,
+            "tolerance": 0.001
+          }
+        ],
+        "reasons": [
+          "solver status is 'solver_error'"
+        ],
+        "metrics": {
+          "mass_balance_relative_error": 7.564135203210601e-07
+        },
+        "constraint_vector": []
+      }
+    }
+  },
+  {
+    "scenario_id": "trial-timeout",
+    "injection": "worker_delay",
+    "state": "ORPHANED",
+    "gate_status": "DIVERGED",
+    "selected_as_best": false,
+    "fluent_execution_count": 0,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "evidence": {
+      "job_id": "job-246fc1c7c399164a4e53",
+      "error": "Job exceeded timeout of 0.05 seconds",
+      "retry_safe": false
+    }
+  },
+  {
+    "scenario_id": "fluent-terminated",
+    "injection": "manual_fluent_stop",
+    "state": "FAILED",
+    "gate_status": "DIVERGED",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "evidence": {
+      "job_id": "job-e067789f9f9597f8e71a",
+      "error": "run_code failed: Fluent gRPC channel was lost during the call. Reconnect with `connect` and re-load any case/data before retrying.",
+      "retry_safe": true
+    }
+  },
+  {
+    "scenario_id": "mcp-restart",
+    "injection": "manual_job_service_restart",
+    "state": "ORPHANED",
+    "gate_status": "DIVERGED",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "evidence": {
+      "job_id": "job-1bb2faebed35740e9512",
+      "error": "Job service restarted before terminal state was persisted",
+      "retry_safe": false
+    }
+  },
+  {
+    "scenario_id": "controller-restart",
+    "injection": "manual_wsl_controller_restart",
+    "state": "TOLD",
+    "gate_status": "PASS",
+    "selected_as_best": false,
+    "fluent_execution_count": 1,
+    "ledger_consistent": true,
+    "result_files_consistent": true,
+    "evidence": {
+      "job_id": "job-bc99c727a0dd44aeb614",
+      "resumed_to": "TOLD"
+    }
+  }
+]

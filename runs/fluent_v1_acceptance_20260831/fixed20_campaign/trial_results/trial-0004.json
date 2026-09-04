@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "trial_number": 4,
+  "sampling_phase": "tpe",
+  "started_at": "2026-08-30T16:18:37.556734+00:00",
+  "completed_at": "2026-08-30T16:19:24.708738+00:00",
+  "parameters": {
+    "cold_inlet_velocity": 1.0981663922194536
+  },
+  "objective_value": 294.2697562159297,
+  "objective_unit": "K",
+  "mass_flow_in": 0.00558212074095189,
+  "mass_flow_out": 0.005582128626390571,
+  "mass_flow_unit": "kg/s",
+  "gates": {
+    "passed": true,
+    "status": "PASS",
+    "checks": [
+      {
+        "name": "solver_status",
+        "passed": true
+      },
+      {
+        "name": "finite_objective_value",
+        "passed": true,
+        "value": 294.2697562159297
+      },
+      {
+        "name": "finite_mass_flow_in",
+        "passed": true,
+        "value": 0.00558212074095189
+      },
+      {
+        "name": "finite_mass_flow_out",
+        "passed": true,
+        "value": 0.005582128626390571
+      },
+      {
+        "name": "mass_balance",
+        "passed": true,
+        "relative_error": 1.4126221748481296e-06,
+        "tolerance": 0.001
+      }
+    ],
+    "reasons": [],
+    "metrics": {
+      "mass_balance_relative_error": 1.4126221748481296e-06
+    },
+    "constraint_vector": []
+  },
+  "duration_seconds": 17.176554800011218,
+  "iterations_requested": 100,
+  "residuals": {
+    "iteration": 89,
+    "values": {
+      "continuity": 0.00094424,
+      "x-velocity": 6.0583e-07,
+      "y-velocity": 1.3652e-06,
+      "z-velocity": 4.7922e-07,
+      "energy": 1.5372e-08,
+      "k": 1.5838e-05,
+      "omega": 9.5054e-06
+    }
+  },
+  "reports": {
+    "mass-flow-out": {
+      "value": -0.005582128626390571,
+      "unit": "kg/s"
+    },
+    "mass-flow-in": {
+      "value": 0.00558212074095189,
+      "unit": "kg/s"
+    },
+    "outlet-temp-avg": {
+      "value": 294.2697562159297,
+      "unit": "K"
+    }
+  },
+  "baseline_reloaded": true,
+  "state": "PASS"
+}

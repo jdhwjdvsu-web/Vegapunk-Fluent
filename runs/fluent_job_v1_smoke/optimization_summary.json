@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "campaign_id": "autofluentoptunademov01-d571931609fe",
+  "campaign_fingerprint": "d571931609feff9e30861a1b480db558c1bdb6515d984c479de0fb8d364a111c",
+  "parent_campaign_id": null,
+  "best_trial": {
+    "trial_number": 0,
+    "parameters": {
+      "cold_inlet_velocity": 0.6621780831931539
+    },
+    "objective_value": 294.7843406982414
+  },
+  "completed": 1,
+  "failed": 0,
+  "retried": 0,
+  "failure_statistics": {},
+  "constraint_statistics": {
+    "PASS": 1
+  },
+  "convergence_trend": [
+    {
+      "trial_number": 0,
+      "objective_value": 294.7843406982414,
+      "gate": "PASS"
+    }
+  ],
+  "numerical_uncertainty": null,
+  "runtime": {
+    "mean_trial_seconds": 24.875604500004556,
+    "total_trial_seconds": 24.875604500004556
+  },
+  "updated_at": "2026-08-30T13:28:48.828861+00:00"
+}

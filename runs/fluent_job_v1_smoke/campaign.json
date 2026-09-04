@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "campaign_id": "autofluentoptunademov01-d571931609fe",
+  "campaign_fingerprint": "d571931609feff9e30861a1b480db558c1bdb6515d984c479de0fb8d364a111c",
+  "parent_campaign_id": null,
+  "target_trials": 6,
+  "created_at": "2026-08-30T13:27:43.017607+00:00",
+  "payload": {
+    "schema_version": 1,
+    "task_name": "AutoFluentOptunaDemoV01",
+    "baseline": {
+      "path": "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\vegapunk-fluent-feasibility\\mixing_elbow.cas.h5",
+      "sha256": "8145813f50f989a521ed8d1b02c891c7ca22ccc5fafa35a4eeba011949f19cbc"
+    },
+    "connection_scientific_settings": {
+      "connect_kwargs": {
+        "ui_mode": "no_gui",
+        "precision": "double",
+        "processor_count": 2,
+        "dimension": 3,
+        "case_file_name": "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\vegapunk-fluent-feasibility\\mixing_elbow.cas.h5",
+        "start_timeout": 180,
+        "cleanup_on_exit": true
+      }
+    },
+    "solver": {
+      "initialization": "hybrid",
+      "iterations": 100,
+      "residual_thresholds": {}
+    },
+    "parameters": [
+      {
+        "name": "cold_inlet_velocity",
+        "collection_path": "setup.boundary_conditions.velocity_inlet",
+        "object_name": "cold-inlet",
+        "property_path": "momentum.velocity_magnitude.value",
+        "unit": "m/s",
+        "minimum": 0.4,
+        "maximum": 1.1,
+        "step": null,
+        "log": false
+      }
+    ],
+    "parameter_constraints": [],
+    "reports": [
+      {
+        "name": "outlet-temp-avg",
+        "kind": "surface",
+        "locations": [
+          "outlet"
+        ],
+        "report_type": "surface-areaavg",
+        "field_name": "temperature"
+      },
+      {
+        "name": "mass-flow-in",
+        "kind": "flux",
+        "locations": [
+          "cold-inlet",
+          "hot-inlet"
+        ],
+        "report_type": null,
+        "field_name": null
+      },
+      {
+        "name": "mass-flow-out",
+        "kind": "flux",
+        "locations": [
+          "outlet"
+        ],
+        "report_type": null,
+        "field_name": null
+      }
+    ],
+    "objective": {
+      "report": "outlet-temp-avg",
+      "direction": "minimize"
+    },
+    "constraints": [],
+    "optimization": {
+      "sampler_seed": 42,
+      "n_startup_trials": 2,
+      "mass_flow_in_report": "mass-flow-in",
+      "mass_flow_out_report": "mass-flow-out",
+      "mass_balance_relative_tolerance": 0.001,
+      "mass_balance_epsilon": 1e-12,
+      "verify_invalid_parameter_gate": true,
+      "max_attempts_per_trial": 2,
+      "heartbeat_seconds": 2.0,
+      "trial_timeout_seconds": 3600.0,
+      "conservation_checks": [],
+      "numerical_monitors": []
+    },
+    "gate_version": "v1",
+    "optuna_version": "4.9.0"
+  }
+}
