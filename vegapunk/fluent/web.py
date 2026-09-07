@@ -218,21 +218,17 @@ def _trial_documents(output_dir: Path) -> list[dict[str, Any]]:
     return trials
 
 
-class RunRequest(BaseModel):
-    """Validated user-editable subset of the Fluent experiment contract."""
+class ParameterRangeRequest(BaseModel):
+    """One bounded parameter selected for a web optimization Campaign."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    case_file: str = Field(min_length=1, max_length=1024)
-    target_trials: int = Field(ge=1, le=100)
     parameter_key: str = Field(min_length=1, max_length=128)
     range_min: float
     range_max: float
-    iterations: int = Field(ge=1, le=1_000_000)
-    endpoint: str = Field(min_length=1, max_length=2048)
 
     @model_validator(mode="after")
-    def validate_range(self) -> RunRequest:
+    def validate_range(self) -> ParameterRangeRequest:
         parameter = _parameter(self.parameter_key)
         parameter.validate_display_value(self.range_min, "参数下限")
         parameter.validate_display_value(self.range_max, "参数上限")
@@ -241,20 +237,54 @@ class RunRequest(BaseModel):
         return self
 
 
-class DirectRunRequest(BaseModel):
-    """Exact, bounded single-point run submitted from the local workbench."""
+class RunRequest(BaseModel):
+    """Validated two-variable subset of the Fluent experiment contract."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     case_file: str = Field(min_length=1, max_length=1024)
-    parameter_key: str = Field(min_length=1, max_length=128)
-    value: float
+    target_trials: int = Field(ge=1, le=100)
+    parameters: list[ParameterRangeRequest] = Field(min_length=2, max_length=2)
     iterations: int = Field(ge=1, le=1_000_000)
     endpoint: str = Field(min_length=1, max_length=2048)
 
     @model_validator(mode="after")
-    def validate_value(self) -> DirectRunRequest:
+    def validate_distinct_parameters(self) -> RunRequest:
+        keys = [item.parameter_key for item in self.parameters]
+        if len(set(keys)) != len(keys):
+            raise ValueError("两个优化变量不能相同")
+        return self
+
+
+class DirectParameterValue(BaseModel):
+    """One exact parameter value used by an audited direct run."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    parameter_key: str = Field(min_length=1, max_length=128)
+    value: float
+
+    @model_validator(mode="after")
+    def validate_value(self) -> DirectParameterValue:
         _parameter(self.parameter_key).validate_display_value(self.value, "参数值")
+        return self
+
+
+class DirectRunRequest(BaseModel):
+    """Exact, bounded two-parameter run submitted from the local workbench."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    case_file: str = Field(min_length=1, max_length=1024)
+    parameters: list[DirectParameterValue] = Field(min_length=2, max_length=2)
+    iterations: int = Field(ge=1, le=1_000_000)
+    endpoint: str = Field(min_length=1, max_length=2048)
+
+    @model_validator(mode="after")
+    def validate_distinct_parameters(self) -> DirectRunRequest:
+        keys = [item.parameter_key for item in self.parameters]
+        if len(set(keys)) != len(keys):
+            raise ValueError("两个审计参数不能相同")
         return self
 
 
@@ -279,20 +309,90 @@ def _default_form(raw: dict[str, Any]) -> dict[str, Any]:
     optimization = raw.get("optimization") or {}
     solver = raw.get("solver") or {}
     selected = _parameter(DEFAULT_PARAMETER_KEY)
+    second = _parameter("hot_inlet_temperature")
     return {
         "case_file": case_file,
         "target_trials": int(optimization.get("target_trials", 6)),
         "parameter_key": selected.key,
         "range_min": selected.recommended_min,
         "range_max": selected.recommended_max,
-        "direct_parameter_key": selected.key,
-        "direct_value": selected.default_value,
+        "parameters": [
+            {
+                "parameter_key": selected.key,
+                "range_min": selected.recommended_min,
+                "range_max": selected.recommended_max,
+            },
+            {
+                "parameter_key": second.key,
+                "range_min": second.recommended_min,
+                "range_max": second.recommended_max,
+            },
+        ],
+        "direct_parameters": [
+            {"parameter_key": selected.key, "value": selected.default_value},
+            {"parameter_key": second.key, "value": second.default_value},
+        ],
         "iterations": int(solver.get("iterations", 100)),
         "endpoint": os.environ.get(
             "FLUENT_MCP_ENDPOINT",
             str(connection.get("endpoint", "http://127.0.0.1:18000/mcp")),
         ),
     }
+
+
+def _restore_form_from_campaign(
+    defaults: dict[str, Any], output_dir: Path
+) -> None:
+    """Restore restart-safe case and two-parameter values from the audit trail."""
+
+    campaign = _read_json(output_dir / "campaign.json") or {}
+    payload = campaign.get("payload")
+    if not isinstance(payload, dict):
+        return
+    baseline = payload.get("baseline")
+    if isinstance(baseline, dict) and baseline.get("path"):
+        defaults["case_file"] = str(baseline["path"])
+    raw_parameters = payload.get("parameters")
+    if not isinstance(raw_parameters, list):
+        return
+    parameters = []
+    for raw_parameter in raw_parameters[:2]:
+        if not isinstance(raw_parameter, dict):
+            continue
+        key = str(raw_parameter.get("name", ""))
+        if key not in PARAMETERS_BY_KEY:
+            continue
+        catalog = _parameter(key)
+        factor = 1.0 / catalog.scale_to_native
+        parameters.append(
+            {
+                "parameter_key": key,
+                "range_min": float(raw_parameter["minimum"]) * factor,
+                "range_max": float(raw_parameter["maximum"]) * factor,
+            }
+        )
+    if len(parameters) != 2:
+        return
+    defaults["parameters"] = parameters
+    summary = _read_json(output_dir / "demo_summary.json") or {}
+    best = summary.get("best_params")
+    if not isinstance(best, dict):
+        best = {}
+    defaults["direct_parameters"] = [
+        {
+            "parameter_key": item["parameter_key"],
+            "value": float(
+                best.get(
+                    item["parameter_key"],
+                    _parameter(item["parameter_key"]).native_value(
+                        _parameter(item["parameter_key"]).default_value
+                    ),
+                )
+            )
+            / _parameter(item["parameter_key"]).scale_to_native,
+        }
+        for item in parameters
+    ]
 
 
 def build_run_spec(spec_path: Path, form: RunRequest) -> ExperimentSpec:
@@ -308,14 +408,25 @@ def build_run_spec(spec_path: Path, form: RunRequest) -> ExperimentSpec:
     connection["allow_remote_endpoint"] = not _is_loopback(parsed.hostname)
     raw["connection"] = connection
 
-    selected = _parameter(form.parameter_key)
-    selected.validate_display_value(form.range_min, "参数下限")
-    selected.validate_display_value(form.range_max, "参数上限")
-    raw["parameters"] = [selected.spec_dict(form.range_min, form.range_max)]
+    selected_parameters = [
+        (
+            _parameter(item.parameter_key),
+            item.range_min,
+            item.range_max,
+        )
+        for item in form.parameters
+    ]
+    raw["parameters"] = [
+        parameter.spec_dict(range_min, range_max)
+        for parameter, range_min, range_max in selected_parameters
+    ]
     raw["design_points"] = [
         {
             "name": "baseline",
-            "values": {selected.key: selected.native_value(selected.default_value)},
+            "values": {
+                parameter.key: parameter.native_value(parameter.default_value)
+                for parameter, _range_min, _range_max in selected_parameters
+            },
         }
     ]
 
@@ -356,20 +467,26 @@ def build_direct_run_spec(
     connection["disconnect_on_exit"] = True
     raw["connection"] = connection
 
-    selected = _parameter(form.parameter_key)
-    selected.validate_display_value(form.value, "参数值")
-    parameter = selected.spec_dict(selected.hard_min, selected.hard_max)
-    raw["parameters"] = [parameter]
+    selected_parameters = [
+        (_parameter(item.parameter_key), item.value) for item in form.parameters
+    ]
+    raw["parameters"] = [
+        parameter.spec_dict(parameter.hard_min, parameter.hard_max)
+        for parameter, _value in selected_parameters
+    ]
 
     solver = dict(raw.get("solver") or {})
     solver["iterations"] = form.iterations
     raw["solver"] = solver
-    native_value = selected.native_value(form.value)
+    native_values = {
+        parameter.key: parameter.native_value(value)
+        for parameter, value in selected_parameters
+    }
     raw["task_name"] = "AutoFluentWebDirectParameterRun"
     raw["design_points"] = [
         {
-            "name": f"direct-{selected.key}-{form.value:g}",
-            "values": {selected.key: native_value},
+            "name": "direct-two-parameter-audit",
+            "values": native_values,
         }
     ]
     optimization = dict(raw.get("optimization") or {})
@@ -600,25 +717,36 @@ class WebRuntime:
         self.direct_finished_at = None
         self.direct_error = None
         self.direct_result = None
-        selected = _parameter(form.parameter_key)
+        selected_parameters = [
+            (_parameter(item.parameter_key), item.value) for item in form.parameters
+        ]
         classification = (
             "baseline_range"
-            if selected.recommended_min <= form.value <= selected.recommended_max
+            if all(
+                parameter.recommended_min <= value <= parameter.recommended_max
+                for parameter, value in selected_parameters
+            )
             else "out_of_baseline_range"
         )
         self.direct_task = asyncio.create_task(
             run_direct_temperature_case(
                 spec,
                 self.output_dir,
-                parameter_value=selected.native_value(form.value),
+                parameter_values={
+                    parameter.key: parameter.native_value(value)
+                    for parameter, value in selected_parameters
+                },
                 iterations=form.iterations,
                 classification=classification,
-                parameter_metadata={
-                    "key": selected.key,
-                    "label": selected.label,
-                    "unit": selected.unit,
-                    "display_value": form.value,
-                },
+                parameter_metadata=[
+                    {
+                        "key": parameter.key,
+                        "label": parameter.label,
+                        "unit": parameter.unit,
+                        "display_value": value,
+                    }
+                    for parameter, value in selected_parameters
+                ],
             ),
             name="fluent-direct-temperature-run",
         )
@@ -644,6 +772,7 @@ def create_app(
         ),
     )
     defaults = _default_form(raw_spec)
+    _restore_form_from_campaign(defaults, runtime.output_dir)
     initial_defaults = dict(defaults)
 
     app = FastAPI(title="Vegapunk Fluent Lab", version="0.1.0")
@@ -732,8 +861,7 @@ def create_app(
                 "case_file": form.case_file,
                 "iterations": form.iterations,
                 "endpoint": form.endpoint,
-                "direct_parameter_key": form.parameter_key,
-                "direct_value": form.value,
+                "direct_parameters": [item.model_dump() for item in form.parameters],
             }
         )
         return {"accepted": True, "status": "running"}

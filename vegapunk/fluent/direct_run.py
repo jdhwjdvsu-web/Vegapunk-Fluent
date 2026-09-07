@@ -98,16 +98,15 @@ async def _call(client, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 def build_direct_temperature_code(
     spec: ExperimentSpec,
     *,
-    parameter_value: float,
+    parameter_values: dict[str, float],
     iterations: int,
     surface: str,
 ) -> str:
     """Build fixed-shape solver and contour code from validated inputs."""
 
-    parameter = spec.parameters[0]
     point = DesignPointSpec(
-        name=f"direct-{parameter.name}-{parameter_value:g}",
-        values={parameter.name: parameter_value},
+        name="direct-two-parameter-audit",
+        values=parameter_values,
     )
     solver_code = build_evaluate_point_code(spec, point).rstrip()
     contour_name = "temperature-contour-direct-run"
@@ -133,20 +132,25 @@ async def run_direct_temperature_case(
     spec: ExperimentSpec,
     output_dir: str | Path,
     *,
-    parameter_value: float,
+    parameter_values: dict[str, float],
     iterations: int,
     classification: str = "controlled_parameter",
-    parameter_metadata: dict[str, Any] | None = None,
+    parameter_metadata: list[dict[str, Any]] | None = None,
     surface: str = "symmetry-xyplane",
 ) -> dict[str, Any]:
     """Run one exact point through PyFluent-MCP and persist its contour."""
 
-    if len(spec.parameters) != 1:
-        raise FluentExperimentError("direct run requires exactly one parameter")
+    if len(spec.parameters) != 2:
+        raise FluentExperimentError("direct run requires exactly two parameters")
     if spec.optimization is None:
         raise FluentExperimentError("direct run requires mass-balance configuration")
-    parameter = spec.parameters[0]
-    parameter_value = parameter.validate_value(parameter_value, parameter.name)
+    expected = {parameter.name: parameter for parameter in spec.parameters}
+    if set(parameter_values) != set(expected):
+        raise FluentExperimentError("direct run parameter values do not match the spec")
+    validated_values = {
+        name: expected[name].validate_value(value, name)
+        for name, value in parameter_values.items()
+    }
     if iterations < 1 or iterations > 1_000_000:
         raise FluentExperimentError("iterations must be between 1 and 1000000")
     _verify_baseline_for_direct_run(spec)
@@ -156,7 +160,7 @@ async def run_direct_temperature_case(
     run_dir.mkdir(parents=True, exist_ok=False)
     code = build_direct_temperature_code(
         spec,
-        parameter_value=parameter_value,
+        parameter_values=validated_values,
         iterations=iterations,
         surface=surface,
     )
@@ -237,14 +241,17 @@ async def run_direct_temperature_case(
         "started_at": started_at,
         "completed_at": _utc_now(),
         "elapsed_seconds": elapsed_seconds,
-        "parameters": {parameter.name: parameter_value},
-        "parameter": parameter_metadata
-        or {
-            "key": parameter.name,
-            "label": parameter.name,
-            "unit": parameter.unit,
-            "display_value": parameter_value,
-        },
+        "parameters": validated_values,
+        "parameter_details": parameter_metadata
+        or [
+            {
+                "key": parameter.name,
+                "label": parameter.name,
+                "unit": parameter.unit,
+                "display_value": validated_values[parameter.name],
+            }
+            for parameter in spec.parameters
+        ],
         "iterations_requested": iterations,
         "residuals": parse_last_residuals(stdout),
         "reports": reports,

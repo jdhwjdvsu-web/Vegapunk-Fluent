@@ -4,8 +4,10 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from vegapunk.fluent.web import (
+    DirectParameterValue,
     DirectRunRequest,
     PARAMETER_CATALOG,
+    ParameterRangeRequest,
     RunRequest,
     build_direct_run_spec,
     build_run_spec,
@@ -20,9 +22,18 @@ def test_build_run_spec_applies_only_bounded_ui_fields():
     form = RunRequest(
         case_file=r"C:\cases\mixing_elbow.cas.h5",
         target_trials=8,
-        parameter_key="hot_inlet_temperature",
-        range_min=300.0,
-        range_max=340.0,
+        parameters=[
+            ParameterRangeRequest(
+                parameter_key="hot_inlet_temperature",
+                range_min=300.0,
+                range_max=340.0,
+            ),
+            ParameterRangeRequest(
+                parameter_key="cold_inlet_velocity",
+                range_min=0.4,
+                range_max=1.1,
+            ),
+        ],
         iterations=150,
         endpoint="http://192.0.2.1:18000/mcp",
     )
@@ -35,6 +46,13 @@ def test_build_run_spec_applies_only_bounded_ui_fields():
     assert spec.parameters[0].minimum == 300.0
     assert spec.parameters[0].maximum == 340.0
     assert spec.parameters[0].property_path == "thermal.temperature.value"
+    assert spec.parameters[1].name == "cold_inlet_velocity"
+    assert spec.parameters[1].minimum == 0.4
+    assert spec.parameters[1].maximum == 1.1
+    assert spec.design_points[0].values == {
+        "hot_inlet_temperature": 313.15,
+        "cold_inlet_velocity": 1.0,
+    }
     assert spec.solver.iterations == 150
     assert spec.optimization is not None
     assert spec.optimization.target_trials == 8
@@ -43,8 +61,14 @@ def test_build_run_spec_applies_only_bounded_ui_fields():
 def test_build_direct_run_spec_uses_exact_value_and_graphics_session():
     form = DirectRunRequest(
         case_file=r"C:\cases\mixing_elbow.cas.h5",
-        parameter_key="cold_inlet_turbulence_intensity",
-        value=5.0,
+        parameters=[
+            DirectParameterValue(
+                parameter_key="cold_inlet_turbulence_intensity", value=5.0
+            ),
+            DirectParameterValue(
+                parameter_key="hot_inlet_temperature", value=340.0
+            ),
+        ],
         iterations=200,
         endpoint="http://127.0.0.1:18000/mcp",
     )
@@ -54,7 +78,8 @@ def test_build_direct_run_spec_uses_exact_value_and_graphics_session():
     assert spec.parameters[0].minimum == 0.001
     assert spec.parameters[0].maximum == 0.3
     assert spec.design_points[0].values == {
-        "cold_inlet_turbulence_intensity": 0.05
+        "cold_inlet_turbulence_intensity": 0.05,
+        "hot_inlet_temperature": 340.0,
     }
     assert spec.solver.iterations == 200
     assert spec.connection.connect_kwargs["ui_mode"] == "hidden_gui"
@@ -117,9 +142,18 @@ def test_remote_client_gets_read_only_state(tmp_path):
             json={
                 "case_file": r"C:\cases\mixing_elbow.cas.h5",
                 "target_trials": 6,
-                "parameter_key": "cold_inlet_velocity",
-                "range_min": 0.4,
-                "range_max": 1.1,
+                "parameters": [
+                    {
+                        "parameter_key": "cold_inlet_velocity",
+                        "range_min": 0.4,
+                        "range_max": 1.1,
+                    },
+                    {
+                        "parameter_key": "hot_inlet_temperature",
+                        "range_min": 303.15,
+                        "range_max": 353.15,
+                    },
+                ],
                 "iterations": 100,
                 "endpoint": "http://127.0.0.1:18000/mcp",
             },
@@ -128,8 +162,10 @@ def test_remote_client_gets_read_only_state(tmp_path):
             "/api/direct-runs",
             json={
                 "case_file": r"C:\cases\mixing_elbow.cas.h5",
-                "parameter_key": "cold_inlet_velocity",
-                "value": 10,
+                "parameters": [
+                    {"parameter_key": "cold_inlet_velocity", "value": 10},
+                    {"parameter_key": "hot_inlet_temperature", "value": 340},
+                ],
                 "iterations": 200,
                 "endpoint": "http://127.0.0.1:18000/mcp",
             },

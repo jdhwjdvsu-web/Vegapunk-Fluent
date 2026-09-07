@@ -10,13 +10,15 @@ const elements = {
   caseFile: $("#case-file"),
   targetTrials: $("#target-trials"),
   iterations: $("#iterations"),
-  parameterSelect: $("#parameter-select"),
-  rangeMin: $("#range-min"),
-  rangeMax: $("#range-max"),
-  rangeUnitMin: $("#range-unit-min"),
-  rangeUnitMax: $("#range-unit-max"),
-  parameterDescription: $("#parameter-description"),
-  parameterSafetyHint: $("#parameter-safety-hint"),
+  parameterRows: [1, 2].map((index) => ({
+    select: $(`#parameter-select-${index}`),
+    rangeMin: $(`#range-min-${index}`),
+    rangeMax: $(`#range-max-${index}`),
+    rangeUnitMin: $(`#range-unit-min-${index}`),
+    rangeUnitMax: $(`#range-unit-max-${index}`),
+    description: $(`#parameter-description-${index}`),
+    safetyHint: $(`#parameter-safety-hint-${index}`),
+  })),
   endpoint: $("#endpoint"),
   budgetTrials: $("#budget-trials"),
   mcpDot: $("#mcp-dot"),
@@ -45,10 +47,12 @@ const elements = {
   resultParameterUnit: $("#result-parameter-unit"),
   resultInsight: $("#result-insight"),
   directForm: $("#direct-run-form"),
-  directParameterSelect: $("#direct-parameter-select"),
-  directValue: $("#direct-value"),
-  directUnit: $("#direct-unit"),
-  directRangeHint: $("#direct-range-hint"),
+  directParameterRows: [1, 2].map((index) => ({
+    select: $(`#direct-parameter-select-${index}`),
+    value: $(`#direct-value-${index}`),
+    unit: $(`#direct-unit-${index}`),
+    rangeHint: $(`#direct-range-hint-${index}`),
+  })),
   directButton: $("#direct-run-button"),
   directButtonLabel: $("#direct-run-button-label"),
   directError: $("#direct-run-error"),
@@ -83,7 +87,7 @@ let submitting = false;
 let directSubmitting = false;
 let lastState = null;
 let parameterCatalog = [];
-let selectedParameterKey = "cold_inlet_velocity";
+let selectedParameterKeys = ["cold_inlet_velocity", "hot_inlet_temperature"];
 let lastConversationRevision = null;
 
 function switchView(name, openAdvanced = false) {
@@ -118,55 +122,72 @@ function populateParameterSelect(select, selectedKey) {
   });
 }
 
-function applyParameterInputs(key, useRecommended = true) {
+function applyParameterInputs(rowIndex, key, useRecommended = true) {
   const parameter = parameterByKey(key);
   if (!parameter) return;
-  selectedParameterKey = parameter.key;
-  elements.parameterSelect.value = parameter.key;
-  elements.rangeMin.min = parameter.hard_min;
-  elements.rangeMin.max = parameter.hard_max;
-  elements.rangeMin.step = parameter.step;
-  elements.rangeMax.min = parameter.hard_min;
-  elements.rangeMax.max = parameter.hard_max;
-  elements.rangeMax.step = parameter.step;
+  const row = elements.parameterRows[rowIndex];
+  selectedParameterKeys[rowIndex] = parameter.key;
+  row.select.value = parameter.key;
+  row.rangeMin.min = parameter.hard_min;
+  row.rangeMin.max = parameter.hard_max;
+  row.rangeMin.step = parameter.step;
+  row.rangeMax.min = parameter.hard_min;
+  row.rangeMax.max = parameter.hard_max;
+  row.rangeMax.step = parameter.step;
   if (useRecommended) {
-    elements.rangeMin.value = parameter.recommended_min;
-    elements.rangeMax.value = parameter.recommended_max;
+    row.rangeMin.value = parameter.recommended_min;
+    row.rangeMax.value = parameter.recommended_max;
   }
-  elements.rangeUnitMin.textContent = parameter.unit;
-  elements.rangeUnitMax.textContent = parameter.unit;
-  elements.parameterDescription.textContent = parameter.description;
-  elements.parameterSafetyHint.textContent = `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
-  elements.projectParameterLabel.textContent = parameter.label;
-  elements.monitorTitle.textContent = `${parameter.label}优化`;
+  row.rangeUnitMin.textContent = parameter.unit;
+  row.rangeUnitMax.textContent = parameter.unit;
+  row.description.textContent = parameter.description;
+  row.safetyHint.textContent = `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
+  const labels = selectedParameterKeys.map((selectedKey) => parameterByKey(selectedKey)?.label).filter(Boolean);
+  elements.projectParameterLabel.textContent = labels.join(" × ");
+  elements.monitorTitle.textContent = `${labels.join(" + ")}优化`;
 }
 
-function applyDirectParameter(key, useDefault = true) {
+function applyDirectParameter(rowIndex, key, useDefault = true) {
   const parameter = parameterByKey(key);
   if (!parameter) return;
-  elements.directParameterSelect.value = parameter.key;
-  elements.directValue.min = parameter.hard_min;
-  elements.directValue.max = parameter.hard_max;
-  elements.directValue.step = parameter.step;
-  if (useDefault) elements.directValue.value = parameter.default_value;
-  elements.directUnit.textContent = parameter.unit;
-  elements.directRangeHint.textContent = `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议范围 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
+  const row = elements.directParameterRows[rowIndex];
+  row.select.value = parameter.key;
+  row.value.min = parameter.hard_min;
+  row.value.max = parameter.hard_max;
+  row.value.step = parameter.step;
+  if (useDefault) row.value.value = parameter.default_value;
+  row.unit.textContent = parameter.unit;
+  row.rangeHint.textContent = `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议范围 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
 }
 
 function setInputValues(defaults, parameters) {
   if (initialized) return;
   parameterCatalog = parameters || [];
-  populateParameterSelect(elements.parameterSelect, defaults.parameter_key);
-  populateParameterSelect(elements.directParameterSelect, defaults.direct_parameter_key);
+  const defaultParameters = defaults.parameters || [
+    { parameter_key: defaults.parameter_key, range_min: defaults.range_min, range_max: defaults.range_max },
+    { parameter_key: "hot_inlet_temperature", range_min: 303.15, range_max: 353.15 },
+  ];
+  elements.parameterRows.forEach((row, index) => {
+    const selected = defaultParameters[index];
+    populateParameterSelect(row.select, selected.parameter_key);
+    applyParameterInputs(index, selected.parameter_key);
+    row.rangeMin.value = selected.range_min;
+    row.rangeMax.value = selected.range_max;
+  });
+  const directParameters = defaults.direct_parameters || defaultParameters.map((item) => ({
+    parameter_key: item.parameter_key,
+    value: parameterByKey(item.parameter_key)?.default_value,
+  }));
+  elements.directParameterRows.forEach((row, index) => {
+    const selected = directParameters[index];
+    populateParameterSelect(row.select, selected.parameter_key);
+    applyDirectParameter(index, selected.parameter_key);
+    row.value.value = selected.value;
+  });
   elements.caseFile.value = defaults.case_file || "";
   elements.targetTrials.value = defaults.target_trials;
   elements.iterations.value = defaults.iterations;
   elements.endpoint.value = defaults.endpoint;
-  applyParameterInputs(defaults.parameter_key || parameterCatalog[0]?.key);
-  elements.rangeMin.value = defaults.range_min;
-  elements.rangeMax.value = defaults.range_max;
-  applyDirectParameter(defaults.direct_parameter_key || defaults.parameter_key || parameterCatalog[0]?.key);
-  elements.directValue.value = defaults.direct_value;
   elements.budgetTrials.textContent = defaults.target_trials;
   const path = defaults.case_file || "尚未配置 case 路径";
   elements.modelPath.textContent = path;
@@ -180,12 +201,37 @@ function formatNumber(value, digits = 3) {
   return Number.isFinite(numeric) ? numeric.toFixed(digits) : "—";
 }
 
+function apiErrorMessage(result, fallback) {
+  if (typeof result?.detail === "string") return result.detail;
+  if (Array.isArray(result?.detail)) {
+    return result.detail.map((item) => item?.msg || String(item)).join("；");
+  }
+  return fallback;
+}
+
 function validTrials(trials) {
   return trials.filter((trial) => {
-    const parameter = Number(trial.parameters?.[selectedParameterKey]);
     const objective = Number(trial.objective_value);
-    return ["COMPLETE", "PASS"].includes(trial.state) && Number.isFinite(parameter) && Number.isFinite(objective);
+    return ["COMPLETE", "PASS"].includes(trial.state) && Number.isFinite(objective);
   });
+}
+
+function parameterKeysForResult(values = {}) {
+  const keys = Object.keys(values).filter((key) => hasCatalogParameter(key));
+  return keys.length ? keys : selectedParameterKeys;
+}
+
+function hasCatalogParameter(key) {
+  return parameterCatalog.some((item) => item.key === key);
+}
+
+function formatParameterCombination(values = {}, keys = parameterKeysForResult(values)) {
+  return keys.map((key) => {
+    const parameter = parameterByKey(key);
+    const nativeValue = Number(values?.[key]);
+    const displayValue = nativeValue * Number(parameter?.native_to_display || 1);
+    return `${parameter?.label || key} ${formatNumber(displayValue, 4)} ${parameter?.unit || ""}`;
+  }).join(" · ");
 }
 
 function renderStatus(state) {
@@ -231,7 +277,7 @@ function renderDirectRun(state) {
     return;
   }
   const relativeError = Number(result.mass_balance_relative_error);
-  const parameter = result.parameter || {};
+  const parameterDetails = result.parameter_details || (result.parameter ? [result.parameter] : []);
   elements.directResult.hidden = false;
   elements.directTemperature.textContent = formatNumber(result.objective_value, 3);
   elements.directMassError.textContent = Number.isFinite(relativeError)
@@ -242,13 +288,13 @@ function renderDirectRun(state) {
   const cacheKey = encodeURIComponent(result.run_id || Date.now());
   elements.directContour.src = `${result.image_url}?v=${cacheKey}`;
   const classification = result.classification === "out_of_baseline_range" ? "扩展异常工况" : "基准范围工况";
-  elements.directCaption.textContent = `Fluent 原生 Static Temperature 云图 · ${parameter.label || parameter.key || "参数"} ${formatNumber(parameter.display_value, 4)} ${parameter.unit || ""} · ${classification}`;
+  const combination = parameterDetails.map((parameter) => `${parameter.label || parameter.key || "参数"} ${formatNumber(parameter.display_value, 4)} ${parameter.unit || ""}`).join(" · ");
+  elements.directCaption.textContent = `Fluent 原生 Static Temperature 云图 · ${combination || formatParameterCombination(result.parameters)} · ${classification}`;
 }
 
 function renderMetrics(state) {
   const summary = state.summary || {};
   const trials = validTrials(state.trials || []);
-  const parameter = parameterByKey(selectedParameterKey);
   const completed = state.job.completed_trials || trials.length;
   const target = state.job.target_trials || state.defaults.target_trials || 0;
   const percent = target ? Math.min(100, (completed / target) * 100) : 0;
@@ -262,16 +308,17 @@ function renderMetrics(state) {
   elements.resultCount.textContent = completed;
 
   const bestValue = summary.best_value;
-  const bestNativeValue = summary.best_params?.[selectedParameterKey];
-  const bestParameterValue = Number(bestNativeValue) * Number(parameter?.native_to_display || 1);
+  const bestCombination = summary.best_params
+    ? formatParameterCombination(summary.best_params)
+    : "—";
   elements.bestTemperature.textContent = formatNumber(bestValue, 3);
-  elements.bestVelocity.textContent = formatNumber(bestParameterValue, 4);
-  elements.bestParameterUnit.textContent = parameter?.unit || "—";
+  elements.bestVelocity.textContent = bestCombination;
+  elements.bestParameterUnit.textContent = "";
   elements.bestTrial.textContent = summary.best_trial_number == null ? "尚无结果" : `Trial #${summary.best_trial_number}`;
   elements.resultBestTemp.textContent = formatNumber(bestValue, 3);
-  elements.resultBestVelocity.textContent = formatNumber(bestParameterValue, 4);
-  elements.resultParameterLabel.textContent = parameter?.label || "参数";
-  elements.resultParameterUnit.textContent = parameter?.unit || "—";
+  elements.resultBestVelocity.textContent = bestCombination;
+  elements.resultParameterLabel.textContent = "参数组合";
+  elements.resultParameterUnit.textContent = "";
 
   if (trials.length > 1) {
     const first = Number(trials[0].objective_value);
@@ -285,8 +332,8 @@ function renderMetrics(state) {
 
   const allPassed = trials.length > 0 && trials.every((trial) => trial.gates?.passed !== false);
   elements.footerGate.textContent = allPassed ? "All passed" : trials.length ? "Review" : "—";
-  if (Number.isFinite(bestParameterValue)) {
-    elements.resultInsight.textContent = `当前最优点位于 ${formatNumber(bestParameterValue, 4)} ${parameter?.unit || ""}。若需要更高精度，可围绕该点缩小参数范围并增加目标 Trial 数。`;
+  if (summary.best_params) {
+    elements.resultInsight.textContent = `当前最优组合为 ${bestCombination}。若需要更高精度，可围绕该组合缩小两个参数范围并增加目标 Trial 数。`;
   }
 
   const updated = summary.updated_at ? new Date(summary.updated_at) : new Date();
@@ -375,27 +422,28 @@ function renderChart(container, points, options) {
 
 function renderCharts(trials) {
   const points = validTrials(trials);
-  const parameter = parameterByKey(selectedParameterKey);
-  const displayValue = (trial) => Number(trial.parameters?.[selectedParameterKey]) * Number(parameter?.native_to_display || 1);
+  const primaryKey = selectedParameterKeys[0];
+  const parameter = parameterByKey(primaryKey);
+  const displayValue = (trial) => Number(trial.parameters?.[primaryKey]) * Number(parameter?.native_to_display || 1);
+  const parameterPoints = points.filter((trial) => Number.isFinite(displayValue(trial)));
   renderChart(elements.objectiveChart, points, {
     x: (trial) => Number(trial.trial_number), y: (trial) => Number(trial.objective_value),
     xFormat: (value) => `#${Math.max(0, Math.round(value))}`, xLabel: "Trial", line: true, area: true,
     empty: "完成试验后显示目标函数历史",
     tooltip: (trial) => `Trial #${trial.trial_number} · ${formatNumber(trial.objective_value, 3)} K`,
   });
-  renderChart(elements.parameterChart, points, {
+  renderChart(elements.parameterChart, parameterPoints, {
     x: displayValue, y: (trial) => Number(trial.objective_value),
     xFormat: (value) => value.toFixed(2), xLabel: `${parameter?.label || "Parameter"} (${parameter?.unit || "—"})`, line: false, area: false,
     empty: "等待有效参数点",
-    tooltip: (trial) => `${formatNumber(displayValue(trial), 4)} ${parameter?.unit || ""} · ${formatNumber(trial.objective_value, 3)} K`,
+    tooltip: (trial) => `${formatParameterCombination(trial.parameters)} · ${formatNumber(trial.objective_value, 3)} K`,
   });
-  elements.parameterChartSubtitle.textContent = `${parameter?.label || "Parameter"} / outlet temperature`;
+  elements.parameterChartSubtitle.textContent = `${parameter?.label || "主变量"} / outlet temperature（完整组合见 Trial）`;
 }
 
 function renderTable(trials) {
   elements.table.replaceChildren();
-  const parameter = parameterByKey(selectedParameterKey);
-  elements.trialParameterHeader.textContent = parameter?.label || "Parameter";
+  elements.trialParameterHeader.textContent = "参数组合";
   if (!trials.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
@@ -414,7 +462,7 @@ function renderTable(trials) {
     const values = [
       `#${trial.trial_number}`,
       trial.sampling_phase === "startup_random" ? "Random" : "TPE",
-      `${formatNumber(Number(trial.parameters?.[selectedParameterKey]) * Number(parameter?.native_to_display || 1), 4)} ${parameter?.unit || ""}`,
+      formatParameterCombination(trial.parameters),
       `${formatNumber(trial.objective_value, 3)} K`,
       Number.isFinite(relativeError) ? `${(relativeError * 100).toExponential(2)}%` : "—",
       trial.duration_seconds == null ? "—" : `${formatNumber(trial.duration_seconds, 1)} s`,
@@ -497,31 +545,42 @@ async function refresh() {
 }
 
 elements.targetTrials.addEventListener("input", () => { elements.budgetTrials.textContent = elements.targetTrials.value || "—"; });
-elements.parameterSelect.addEventListener("change", () => {
-  applyParameterInputs(elements.parameterSelect.value);
-  renderCharts(lastState?.trials || []);
-  renderTable(lastState?.trials || []);
-  renderMetrics(lastState || { summary: {}, trials: [], job: {}, defaults: {} });
+elements.parameterRows.forEach((row, index) => {
+  row.select.addEventListener("change", () => {
+    applyParameterInputs(index, row.select.value);
+    renderCharts(lastState?.trials || []);
+    renderTable(lastState?.trials || []);
+    renderMetrics(lastState || { summary: {}, trials: [], job: {}, defaults: {} });
+  });
 });
-elements.directParameterSelect.addEventListener("change", () => {
-  applyDirectParameter(elements.directParameterSelect.value);
+elements.directParameterRows.forEach((row, index) => {
+  row.select.addEventListener("change", () => applyDirectParameter(index, row.select.value));
 });
 
 elements.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   elements.formError.textContent = "";
   if (!elements.form.reportValidity()) return;
-  const rangeMin = Number(elements.rangeMin.value);
-  const rangeMax = Number(elements.rangeMax.value);
-  if (rangeMin >= rangeMax) {
-    elements.formError.textContent = "参数上限必须大于下限";
-    elements.rangeMax.focus();
+  const parameters = elements.parameterRows.map((row) => ({
+    parameter_key: row.select.value,
+    range_min: Number(row.rangeMin.value),
+    range_max: Number(row.rangeMax.value),
+  }));
+  if (new Set(parameters.map((item) => item.parameter_key)).size !== parameters.length) {
+    elements.formError.textContent = "两个优化变量不能相同";
+    elements.parameterRows[1].select.focus();
     return;
+  }
+  for (const [index, parameter] of parameters.entries()) {
+    if (parameter.range_min >= parameter.range_max) {
+      elements.formError.textContent = `变量 ${index + 1} 的上限必须大于下限`;
+      elements.parameterRows[index].rangeMax.focus();
+      return;
+    }
   }
   const payload = {
     case_file: elements.caseFile.value.trim(), target_trials: Number(elements.targetTrials.value),
-    iterations: Number(elements.iterations.value), parameter_key: elements.parameterSelect.value,
-    range_min: rangeMin, range_max: rangeMax,
+    iterations: Number(elements.iterations.value), parameters,
     endpoint: elements.endpoint.value.trim(),
   };
   submitting = true;
@@ -530,7 +589,7 @@ elements.form.addEventListener("submit", async (event) => {
   try {
     const response = await fetch("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || "启动失败");
+    if (!response.ok) throw new Error(apiErrorMessage(result, "启动失败"));
     switchView("monitor");
     await refresh();
   } catch (error) {
@@ -541,21 +600,30 @@ elements.form.addEventListener("submit", async (event) => {
   }
 });
 
-async function submitDirectRun(value, fromAgent = false) {
-  const numericValue = Number(value);
-  const parameter = parameterByKey(elements.directParameterSelect.value);
-  const min = Number(parameter?.hard_min);
-  const max = Number(parameter?.hard_max);
-  if (!Number.isFinite(numericValue) || numericValue < min || numericValue > max) {
-    const message = `${parameter?.label || "参数"}必须在 ${min}–${max} ${parameter?.unit || ""} 之间。`;
+async function submitDirectRun(fromAgent = false) {
+  const parameters = elements.directParameterRows.map((row) => ({
+    parameter: parameterByKey(row.select.value),
+    value: Number(row.value.value),
+  }));
+  if (new Set(parameters.map((item) => item.parameter?.key)).size !== parameters.length) {
+    const message = "两个审计参数不能相同。";
     elements.directError.textContent = message;
     if (fromAgent) addAgentMessage(message);
     return false;
   }
+  for (const item of parameters) {
+    const min = Number(item.parameter?.hard_min);
+    const max = Number(item.parameter?.hard_max);
+    if (!Number.isFinite(item.value) || item.value < min || item.value > max) {
+      const message = `${item.parameter?.label || "参数"}必须在 ${min}–${max} ${item.parameter?.unit || ""} 之间。`;
+      elements.directError.textContent = message;
+      if (fromAgent) addAgentMessage(message);
+      return false;
+    }
+  }
   const payload = {
     case_file: elements.caseFile.value.trim(),
-    parameter_key: parameter.key,
-    value: numericValue,
+    parameters: parameters.map((item) => ({ parameter_key: item.parameter.key, value: item.value })),
     iterations: Number(elements.iterations.value),
     endpoint: elements.endpoint.value.trim(),
   };
@@ -570,9 +638,8 @@ async function submitDirectRun(value, fromAgent = false) {
       body: JSON.stringify(payload),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || "单点计算启动失败");
-    elements.directValue.value = numericValue;
-    if (fromAgent) addAgentMessage(`已提交${parameter.label} = ${numericValue} ${parameter.unit}。Fluent 将自动计算并返回温度云图。`);
+    if (!response.ok) throw new Error(apiErrorMessage(result, "单点计算启动失败"));
+    if (fromAgent) addAgentMessage(`已提交双参数组合：${parameters.map((item) => `${item.parameter.label} = ${item.value} ${item.parameter.unit}`).join("，")}。Fluent 将自动计算并返回温度云图。`);
     switchView("results");
     await refresh();
     return true;
@@ -589,7 +656,7 @@ async function submitDirectRun(value, fromAgent = false) {
 elements.directForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!elements.directForm.reportValidity()) return;
-  await submitDirectRun(elements.directValue.value);
+  await submitDirectRun();
 });
 
 function addAgentMessage(text, user = false) {
@@ -653,8 +720,11 @@ elements.agentForm.addEventListener("submit", async (event) => {
   elements.agentQuestion.value = "";
   const directParameter = directParameterFromQuestion(question);
   if (directParameter) {
-    applyDirectParameter(directParameter.key, false);
-    await submitDirectRun(directParameter.value, true);
+    const matchedIndex = elements.directParameterRows.findIndex((row) => row.select.value === directParameter.key);
+    const rowIndex = matchedIndex >= 0 ? matchedIndex : 0;
+    applyDirectParameter(rowIndex, directParameter.key, false);
+    elements.directParameterRows[rowIndex].value.value = directParameter.value;
+    await submitDirectRun(true);
     return;
   }
   window.setTimeout(() => addAgentMessage(plannerReply(question)), 220);
@@ -683,7 +753,7 @@ elements.newTaskButton.addEventListener("click", async () => {
     if (!response.ok) throw new Error(result.detail || "新建任务失败");
     initialized = false;
     parameterCatalog = [];
-    selectedParameterKey = "cold_inlet_velocity";
+    selectedParameterKeys = ["cold_inlet_velocity", "hot_inlet_temperature"];
     lastState = null;
     clearConversationView();
     switchView("model");
@@ -695,7 +765,7 @@ elements.newTaskButton.addEventListener("click", async () => {
 
 $("#accept-suggestion").addEventListener("click", () => switchView("plan"));
 $("#generate-plan").addEventListener("click", () => {
-  addAgentMessage("已根据当前模型和研究问题生成单参数温度优化方案。请检查速度范围、质量守恒 Gate 与试验预算。" );
+  addAgentMessage("已根据当前模型和研究问题生成双参数温度优化方案。请检查两个变量的范围、质量守恒 Gate 与试验预算。" );
   switchView("plan");
 });
 
