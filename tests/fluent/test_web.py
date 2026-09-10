@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 from vegapunk.fluent.web import (
     DirectParameterValue,
     DirectRunRequest,
-    PARAMETER_CATALOG,
     ParameterRangeRequest,
     RunRequest,
     build_direct_run_spec,
@@ -121,12 +120,10 @@ def test_state_api_reads_saved_results_and_allows_enabled_control(tmp_path):
     assert payload["summary"]["best_value"] == 300.25
     assert payload["trials"] == [trial]
     assert payload["direct_run"]["status"] == "idle"
-    assert {item["category"] for item in payload["parameters"]} == {
-        "边界条件",
-        "湍流",
-        "材料物性",
-    }
-    assert len(payload["parameters"]) == len(PARAMETER_CATALOG)
+    # An unscanned Case must never inherit Mixing Elbow's fixed parameter list.
+    assert payload["parameters"] == []
+    assert payload["model"]["status"] == "unparsed"
+    assert payload["model"]["execution_ready"] is False
     assert payload["task"]["id"] == "legacy"
     assert page.status_code == 200
     assert "Vegapunk-Fluent" in page.text

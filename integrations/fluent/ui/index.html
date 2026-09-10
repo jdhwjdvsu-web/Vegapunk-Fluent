@@ -6,7 +6,7 @@
     <meta name="description" content="Vegapunk-Fluent AI Scientist Simulation Workbench" />
     <title>Vegapunk-Fluent · 科研任务工作台</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232864dc'/><path d='M8 9l8 16 8-16h-5l-3 8-3-8z' fill='white'/></svg>" />
-    <link rel="stylesheet" href="/assets/app.css?v=20260905-dual3" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260907-adaptive1" />
   </head>
   <body>
     <header class="topbar">
@@ -52,18 +52,24 @@
         <section id="view-model" class="view" aria-labelledby="model-title">
           <header class="view-header"><div><p class="kicker">STEP 01</p><h1 id="model-title">模型与实验数据</h1><p>先建立可追溯的 Fluent 基线，再由 Agent 生成实验方案。</p></div></header>
           <section class="setup-grid">
-            <article class="setup-card model-loaded"><div class="setup-step">01</div><span class="setup-icon">◇</span><h2>Fluent 模型</h2><strong id="model-name">mixing_elbow.cas.h5</strong><p id="model-path">等待载入路径</p><dl><div><dt>求解器</dt><dd>3D · Pressure-Based</dd></div><div><dt>状态</dt><dd class="ok">✓ 基线就绪</dd></div></dl><button class="secondary-button" type="button" data-view="plan">使用此模型</button></article>
+            <article class="setup-card model-loaded"><div class="setup-step">01</div><span class="setup-icon">◇</span><h2>Fluent 模型</h2><strong id="model-name">mixing_elbow.cas.h5</strong><p id="model-path">等待载入路径</p><p id="model-scan-status" role="status">尚未分析模型</p>
+<label>Case 路径<input id="model-case-path" type="text" placeholder="D:\\cases\\example.cas.h5" /></label>
+<label>维度<select id="model-dimension"><option value="3">3D</option><option value="2">2D</option></select></label>
+<label>Fluent 版本（可选，填写后启用版本缓存）<input id="model-version" placeholder="例如 25.2.0" /></label>
+<button id="analyze-model" class="primary-button" type="button">分析模型</button>
+<button id="force-analyze" class="secondary-button" type="button">强制重新分析</button>
+<details><summary>模型库 / 最近模型</summary><select id="model-library" aria-label="选择历史模型"><option value="">请选择</option></select></details></article>
             <article class="setup-card"><div class="setup-step">02</div><span class="setup-icon">▤</span><h2>实验数据</h2><strong>可选校准数据</strong><p>CSV / Excel / 历史实验结果</p><div class="drop-zone"><span>＋</span><strong>选择数据文件</strong><small>当前 walking skeleton 尚未启用数据上传</small></div></article>
           </section>
-          <article class="research-goal-card"><div><p class="kicker">RESEARCH QUESTION</p><h2>告诉 Agent 你想研究什么</h2><p>自然语言会被整理为可审查的 ExperimentSpec，而不是直接执行任意代码。</p></div><textarea id="goal-input" rows="4">研究冷入口流速与热入口温度对混合弯管出口平均温度的共同影响，在满足质量守恒误差小于 0.1% 的前提下，寻找最低出口温度。</textarea><div class="goal-actions"><span>当前支持 2 个数值参数与 1 个标量目标</span><button class="primary-button" type="button" id="generate-plan">生成实验方案 →</button></div></article>
+          <article class="research-goal-card"><div><p class="kicker">RESEARCH QUESTION</p><h2>告诉 Agent 你想研究什么</h2><p>自然语言会被整理为可审查的 ExperimentSpec，而不是直接执行任意代码。</p></div><textarea id="goal-input" rows="4">研究冷入口流速与热入口温度对混合弯管出口平均温度的共同影响，在满足质量守恒误差小于 0.1% 的前提下，寻找最低出口温度。</textarea><div class="goal-actions"><span>V1 支持 1～5 个数值参数；目标与 Gate 必须确认</span><button class="primary-button" type="button" id="generate-plan">生成实验方案 →</button></div></article>
         </section>
 
         <section id="view-plan" class="view" aria-labelledby="plan-title">
           <header class="view-header"><div><p class="kicker">STEP 02 · AGENT GENERATED</p><h1 id="plan-title">实验方案确认</h1><p>批准前请核对变量、目标、Gate 和计算预算。</p></div><span class="review-badge">等待批准</span></header>
           <form id="run-form" class="plan-layout" novalidate>
             <div class="plan-main">
-              <article class="plan-section"><div class="plan-number">01</div><div class="plan-content"><h2>两个优化变量</h2><p>每个 Trial 会同时修改下面两个 Fluent 参数；两个变量不能选择相同项目。</p><div class="parameter-list"><div class="parameter-row parameter-picker"><span class="variable-chip">变量 1</span><label class="parameter-select-wrap"><span>修改参数</span><select id="parameter-select-1" required aria-label="选择第一个优化参数"></select><small id="parameter-description-1">从当前 Case 的受控白名单中选择。</small></label><label><span>MIN · <b id="range-unit-min-1">—</b></span><input id="range-min-1" type="number" required /></label><span class="range-arrow">→</span><label><span>MAX · <b id="range-unit-max-1">—</b></span><input id="range-max-1" type="number" required /></label><p id="parameter-safety-hint-1" class="parameter-safety-hint">等待参数目录。</p></div><div class="parameter-row parameter-picker"><span class="variable-chip">变量 2</span><label class="parameter-select-wrap"><span>修改参数</span><select id="parameter-select-2" required aria-label="选择第二个优化参数"></select><small id="parameter-description-2">从当前 Case 的受控白名单中选择。</small></label><label><span>MIN · <b id="range-unit-min-2">—</b></span><input id="range-min-2" type="number" required /></label><span class="range-arrow">→</span><label><span>MAX · <b id="range-unit-max-2">—</b></span><input id="range-max-2" type="number" required /></label><p id="parameter-safety-hint-2" class="parameter-safety-hint">等待参数目录。</p></div></div></div></article>
-              <article class="plan-section"><div class="plan-number">02</div><div class="plan-content"><h2>目标</h2><div class="objective-row"><span class="direction-tag min">MIN</span><div><strong>Outlet temperature average</strong><small>出口面 · surface-areaavg · temperature</small></div></div></div></article>
+              <article class="plan-section"><div class="plan-number">01</div><div class="plan-content"><h2>优化变量</h2><p>每个 Trial 同时修改所选参数。默认推荐 2 个，支持 1～5 个，不可重复。</p><div id="parameter-list" class="parameter-list"></div><button id="add-parameter" class="secondary-button" type="button">＋ 添加优化变量</button><button id="save-ranges" class="secondary-button" type="button">保存范围</button></div></article>
+              <article class="plan-section"><div class="plan-number">02</div><div class="plan-content"><h2>目标</h2><p id="contract-status" role="status">请先分析模型；以下为既有验收模板，新模型不能直接沿用。</p><div class="objective-row"><span class="direction-tag min">MIN</span><div><strong>Outlet temperature average</strong><small>出口面 · surface-areaavg · temperature</small></div></div></div></article>
               <article class="plan-section"><div class="plan-number">03</div><div class="plan-content"><h2>质量与安全 Gate</h2><div class="constraint-list"><div><span class="gate-icon pass">✓</span><p><strong>Mass imbalance</strong><small>相对误差 &lt; 0.1%</small></p></div><div><span class="gate-icon pass">✓</span><p><strong>Finite outputs</strong><small>目标值与报告值必须为有限数</small></p></div><div><span class="gate-icon neutral">○</span><p><strong>Residual threshold</strong><small>当前 Demo 仅记录，不作为拒绝条件</small></p></div></div></div></article>
               <details id="advanced-settings" class="advanced-settings"><summary>高级设置 <span>Connection · Solver · Optimization</span></summary><div class="advanced-grid"><label><span>Fluent case 文件</span><input id="case-file" name="case_file" type="text" placeholder="C:\cases\mixing_elbow.cas.h5" required /></label><label><span>MCP 地址</span><input id="endpoint" name="endpoint" type="url" required /></label><label><span>目标试验数</span><input id="target-trials" name="target_trials" type="number" min="1" max="100" required /></label><label><span>每次求解迭代</span><input id="iterations" name="iterations" type="number" min="1" max="1000000" required /></label></div></details>
             </div>
@@ -74,10 +80,9 @@
         <section id="view-results" class="view" aria-labelledby="results-title">
           <header class="view-header"><div><p class="kicker">STEP 04</p><h1 id="results-title">结果与可审计产物</h1><p>把最佳结果、有效 Trial 与底层计算记录放在同一个交付面。</p></div></header>
           <section class="direct-run-card" aria-labelledby="direct-run-title">
-            <div class="direct-run-copy"><p class="kicker">DIRECT FLUENT CONTROL</p><h2 id="direct-run-title">双参数审计与温度云图</h2><p>从白名单选择两个参数并输入精确值。网页会重新载入基准 Case，通过 MCP 同时修改两项参数、计算并读取 Fluent 原生云图。</p><span>每次复算都会保存双参数、求解报告、Gate 与云图。</span></div>
+            <div class="direct-run-copy"><p class="kicker">DIRECT FLUENT CONTROL</p><h2 id="direct-run-title">参数审计与温度云图</h2><p>从当前模型目录选择参数并输入精确值。网页会重新载入基准 Case，通过 MCP 修改所选参数、计算并读取 Fluent 原生云图。</p><span>每次复算都会保存参数组合、求解报告、Gate 与云图。</span></div>
             <form id="direct-run-form" class="direct-run-form">
-              <div class="direct-parameter-row"><b>参数 1</b><label><span>修改参数</span><select id="direct-parameter-select-1" required aria-label="选择第一个审计参数"></select></label><label><span>参数值</span><div><input id="direct-value-1" type="number" required /><b id="direct-unit-1">—</b></div></label><small id="direct-range-hint-1">选择参数后显示允许范围。</small></div>
-              <div class="direct-parameter-row"><b>参数 2</b><label><span>修改参数</span><select id="direct-parameter-select-2" required aria-label="选择第二个审计参数"></select></label><label><span>参数值</span><div><input id="direct-value-2" type="number" required /><b id="direct-unit-2">—</b></div></label><small id="direct-range-hint-2">选择参数后显示允许范围。</small></div>
+              <div id="direct-parameter-list"></div><button id="add-direct-parameter" class="secondary-button" type="button">＋ 添加参数</button>
               <button id="direct-run-button" class="primary-button" type="submit"><span id="direct-run-button-label">计算并生成云图</span><span>→</span></button>
               <p id="direct-run-error" class="direct-run-error" role="alert"></p>
             </form>
@@ -93,18 +98,18 @@
       </main>
 
       <aside class="agent-panel" aria-labelledby="agent-title">
-        <header><div><span class="agent-avatar">A</span><div><h2 id="agent-title">Agent 助手</h2><p>Planner + Fluent control</p></div></div><div class="agent-header-actions"><button id="clear-conversation" type="button" title="仅清空当前对话">清空对话</button><span class="planner-badge">受控执行</span></div></header>
+        <header><div><span class="agent-avatar">A</span><div><h2 id="agent-title">Agent 助手</h2><p>规则推荐 · 非大模型</p></div></div><div class="agent-header-actions"><button id="clear-conversation" type="button" title="仅清空当前对话">清空对话</button><span class="planner-badge">受控执行</span></div></header>
         <div id="agent-thread" class="agent-thread" aria-live="polite">
-          <article class="agent-message"><span>A</span><div><p>模型基线已读取。当前 ExperimentSpec 将同时优化 <strong>2 个可调参数</strong>。</p><time>模型检查</time></div></article>
-          <article class="agent-message"><span>A</span><div><p>建议先完成双参数温度优化，再决定是否扩展约束或多目标能力。</p><button id="accept-suggestion" type="button">查看建议方案</button><time>方案建议</time></div></article>
+          <article class="agent-message"><span>A</span><div><p>请先分析 Case。参数目录来自模型扫描，推荐不等于工程批准。</p><time>模型检查</time></div></article>
+          <article class="agent-message"><span>A</span><div><p>默认推荐两个常用参数，你可以替换、增加或删除。</p><button id="accept-suggestion" type="button">查看建议方案</button><time>方案建议</time></div></article>
           <article id="agent-result-message" class="agent-message"><span>A</span><div><p>正在等待实验状态…</p><time>实时监控</time></div></article>
         </div>
         <form id="agent-form" class="agent-input"><label for="agent-question">描述目标、询问结果或提交单点计算</label><textarea id="agent-question" rows="3" placeholder="例如：将 cold-inlet 设为 10 m/s，提交计算并生成温度云图"></textarea><div><span>Enter 发送 · Shift+Enter 换行</span><button type="submit" aria-label="发送">↑</button></div></form>
-        <p class="agent-disclaimer">仅执行受控参数修改、计算与云图导出；不接收任意代码。</p>
+        <p class="agent-disclaimer">规则助手只准备参数；计算须在表单明确提交。不接收任意代码。</p>
       </aside>
     </div>
 
     <footer class="runtime-bar" aria-label="运行状态"><div><span class="runtime-label">TRIAL</span><strong id="footer-trial">0 / 0</strong></div><div><span id="footer-fluent-dot" class="status-dot muted"></span><span>Fluent</span><strong id="footer-fluent">Checking</strong></div><div><span>Runner</span><strong id="footer-runner">Idle</strong></div><div><span>Gate</span><strong id="footer-gate">—</strong></div><div class="runtime-right"><span id="updated-at">等待数据</span></div></footer>
-    <script src="/assets/app.js?v=20260905-dual3" defer></script>
+    <script src="/assets/app.js?v=20260907-adaptive1" defer></script>
   </body>
 </html>

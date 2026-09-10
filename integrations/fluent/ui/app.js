@@ -10,15 +10,7 @@ const elements = {
   caseFile: $("#case-file"),
   targetTrials: $("#target-trials"),
   iterations: $("#iterations"),
-  parameterRows: [1, 2].map((index) => ({
-    select: $(`#parameter-select-${index}`),
-    rangeMin: $(`#range-min-${index}`),
-    rangeMax: $(`#range-max-${index}`),
-    rangeUnitMin: $(`#range-unit-min-${index}`),
-    rangeUnitMax: $(`#range-unit-max-${index}`),
-    description: $(`#parameter-description-${index}`),
-    safetyHint: $(`#parameter-safety-hint-${index}`),
-  })),
+  parameterRows: [],
   endpoint: $("#endpoint"),
   budgetTrials: $("#budget-trials"),
   mcpDot: $("#mcp-dot"),
@@ -47,12 +39,7 @@ const elements = {
   resultParameterUnit: $("#result-parameter-unit"),
   resultInsight: $("#result-insight"),
   directForm: $("#direct-run-form"),
-  directParameterRows: [1, 2].map((index) => ({
-    select: $(`#direct-parameter-select-${index}`),
-    value: $(`#direct-value-${index}`),
-    unit: $(`#direct-unit-${index}`),
-    rangeHint: $(`#direct-range-hint-${index}`),
-  })),
+  directParameterRows: [],
   directButton: $("#direct-run-button"),
   directButtonLabel: $("#direct-run-button-label"),
   directError: $("#direct-run-error"),
@@ -87,8 +74,160 @@ let submitting = false;
 let directSubmitting = false;
 let lastState = null;
 let parameterCatalog = [];
-let selectedParameterKeys = ["cold_inlet_velocity", "hot_inlet_temperature"];
+let selectedParameterKeys = [];
 let lastConversationRevision = null;
+let renderedModelId = null;
+
+
+let maxParameters = 5;
+let scanSubmitting = false;
+let libraryEntries = [];
+
+function rebuildRows(parameters, directParameters) {
+  $("#parameter-list").replaceChildren();
+  $("#direct-parameter-list").replaceChildren();
+  elements.parameterRows = [];
+  elements.directParameterRows = [];
+  selectedParameterKeys = [];
+  parameters.forEach((item) => addParameterRow(false, item));
+  directParameters.forEach((item) => addParameterRow(true, item));
+  updateAddButtons();
+}
+
+function updateAddButtons() {
+  $("#add-parameter").disabled = elements.parameterRows.length >= Math.min(maxParameters, parameterCatalog.length);
+  $("#add-direct-parameter").disabled = elements.directParameterRows.length >= Math.min(maxParameters, parameterCatalog.length);
+}
+
+function rowValues(direct) {
+  return (direct ? elements.directParameterRows : elements.parameterRows).map((row) => direct
+    ? { parameter_key: row.select.value, value: row.value.value }
+    : { parameter_key: row.select.value, range_min: row.rangeMin.value, range_max: row.rangeMax.value });
+}
+
+function addParameterRow(direct, selected = null) {
+  const rows = direct ? elements.directParameterRows : elements.parameterRows;
+  if (rows.length >= maxParameters) return;
+  const used = new Set(rows.map((row) => row.select.value));
+  const parameter = selected ? parameterByKey(selected.parameter_key) : parameterCatalog.find((item) => !used.has(item.key));
+  if (!parameter) return;
+  const card = document.createElement("div");
+  card.className = direct ? "direct-parameter-row" : "parameter-row parameter-picker";
+  card.innerHTML = direct
+    ? '<b class="variable-chip"></b><label><span>修改参数</span><select required></select></label><label><span>参数值</span><div><input type="number" required /><b class="unit"></b></div></label><small class="hint"></small><button type="button" class="remove-parameter">× 删除</button>'
+    : '<span class="variable-chip"></span><label class="parameter-select-wrap"><span>修改参数</span><select required></select><small class="description"></small></label><label><span>MIN · <b class="min-unit"></b></span><input class="range-min" type="number" required /></label><span class="range-arrow">→</span><label><span>MAX · <b class="max-unit"></b></span><input class="range-max" type="number" required /></label><p class="parameter-safety-hint"></p><button type="button" class="remove-parameter">× 删除</button>';
+  card.querySelector(".variable-chip").textContent = `变量 ${rows.length + 1}`;
+  const select = card.querySelector("select");
+  select.setAttribute("aria-label", `${direct ? "审计" : "优化"}变量 ${rows.length + 1}`);
+  const row = direct
+    ? { card, select, value: card.querySelector("input"), unit: card.querySelector(".unit"), rangeHint: card.querySelector(".hint") }
+    : { card, select, rangeMin: card.querySelector(".range-min"), rangeMax: card.querySelector(".range-max"),
+        rangeUnitMin: card.querySelector(".min-unit"), rangeUnitMax: card.querySelector(".max-unit"),
+        description: card.querySelector(".description"), safetyHint: card.querySelector(".parameter-safety-hint") };
+  rows.push(row);
+  $(direct ? "#direct-parameter-list" : "#parameter-list").append(card);
+  populateParameterSelect(select, parameter.key);
+  const index = rows.length - 1;
+  if (direct) {
+    applyDirectParameter(index, parameter.key);
+    if (selected) row.value.value = selected.value ?? "";
+  } else {
+    applyParameterInputs(index, parameter.key);
+    if (selected) {
+      row.rangeMin.value = selected.range_min ?? "";
+      row.rangeMax.value = selected.range_max ?? "";
+    }
+  }
+  select.addEventListener("change", () => {
+    if (direct) applyDirectParameter(rows.indexOf(row), select.value);
+    else applyParameterInputs(rows.indexOf(row), select.value);
+  });
+  card.querySelector(".remove-parameter").addEventListener("click", () => {
+    if (rows.length <= 1) return;
+    const plan = rowValues(false), single = rowValues(true);
+    (direct ? single : plan).splice(rows.indexOf(row), 1);
+    rebuildRows(plan, single);
+  });
+  updateAddButtons();
+}
+
+$("#add-parameter").addEventListener("click", () => addParameterRow(false));
+$("#add-direct-parameter").addEventListener("click", () => addParameterRow(true));
+
+function renderModelState(state) {
+  const model = state.model || {};
+  maxParameters = model.max_parameters || 5;
+  const profile = model.profile;
+  const scanning = model.status === "scanning" || scanSubmitting;
+  $("#model-scan-status").textContent = scanning ? "正在分析 Fluent 模型：边界 / 材料 / 物理场 / 报告……"
+    : profile ? `✓ 已解析 · ${state.parameters.length} 个候选参数 · Fluent ${profile.fluent_version} · ${profile.signature.warnings.length} 条扫描提示`
+    : "尚未解析，请选择 Case 并分析";
+  $("#contract-status").textContent = model.execution_ready
+    ? "沿用 SHA256 一致的已验收模板：出口平均温度 MIN + 质量守恒 Gate。"
+    : "待配置：此模型的 Objective / Gate 未确认，当前禁止提交计算。";
+  $("#model-check").textContent = profile ? "✓" : "○";
+  $(".project-card strong").textContent = profile?.name || "Fluent 模型";
+  $(".project-icon").textContent = "CFD";
+  $("#analyze-model").disabled = scanning || !state.server.can_control || state.job.status === "running" || state.direct_run.status === "running";
+  $("#force-analyze").disabled = $("#analyze-model").disabled;
+  $("#save-ranges").disabled = !profile || scanning || !state.server.can_control;
+  if (!$("#model-case-path").value && elements.caseFile.value) $("#model-case-path").value = elements.caseFile.value;
+}
+
+async function loadModelLibrary() {
+  const response = await fetch("/api/models");
+  if (!response.ok) return;
+  libraryEntries = (await response.json()).models;
+  const select = $("#model-library");
+  select.replaceChildren(new Option("请选择历史模型", ""));
+  libraryEntries.forEach((item, index) => select.add(new Option(`${item.name} · Fluent ${item.fluent_version}`, String(index))));
+}
+$("#model-library").addEventListener("change", () => {
+  if ($("#model-library").value === "") return;
+  const item = libraryEntries[Number($("#model-library").value)];
+  $("#model-case-path").value = item.case_file;
+  $("#model-version").value = item.product_version || "";
+  $("#model-dimension").value = item.dimension;
+});
+
+async function analyzeModel(force) {
+  if (scanSubmitting) return;
+  scanSubmitting = true;
+  const casePath = $("#model-case-path").value.trim() || elements.caseFile.value.trim();
+  try {
+    const response = await fetch("/api/models/analyze", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ case_file: casePath, endpoint: elements.endpoint.value.trim(),
+        dimension: Number($("#model-dimension").value), product_version: $("#model-version").value.trim(),
+        question: $("#goal-input").value, force }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(apiErrorMessage(result, "模型分析失败"));
+    initialized = false;
+    await refresh();
+    addAgentMessage(`${result.cached ? "复用模型 Profile" : "模型扫描完成"}，推荐采用规则评分，不调用大模型。请确认范围；未适配的目标和 Gate 会阻止计算。`);
+    switchView("plan");
+    await loadModelLibrary();
+  } catch (error) {
+    $("#model-scan-status").textContent = error.message;
+    addAgentMessage(error.message);
+  } finally {
+    scanSubmitting = false;
+  }
+}
+$("#analyze-model").addEventListener("click", () => analyzeModel(false));
+$("#force-analyze").addEventListener("click", () => analyzeModel(true));
+elements.caseFile.addEventListener("input", () => { $("#model-case-path").value = elements.caseFile.value; });
+$("#model-case-path").addEventListener("input", () => { elements.caseFile.value = $("#model-case-path").value; });
+$("#save-ranges").addEventListener("click", async () => {
+  if (!elements.form.reportValidity()) return;
+  try {
+    const parameters = rowValues(false).map((item) => ({...item, range_min: Number(item.range_min), range_max: Number(item.range_max)}));
+    const response = await fetch("/api/models/ranges", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({parameters})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(apiErrorMessage(result, "保存失败"));
+    addAgentMessage("当前选择和人工确认范围已保存到模型 Profile。");
+  } catch (error) { addAgentMessage(error.message); }
+});
+loadModelLibrary().catch(() => {});
 
 function switchView(name, openAdvanced = false) {
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${name}`));
@@ -102,7 +241,7 @@ $$('[data-view]').forEach((button) => {
 });
 
 function parameterByKey(key) {
-  return parameterCatalog.find((item) => item.key === key) || parameterCatalog[0] || null;
+  return parameterCatalog.find((item) => item.key === key) || null;
 }
 
 function populateParameterSelect(select, selectedKey) {
@@ -114,7 +253,7 @@ function populateParameterSelect(select, selectedKey) {
     parameterCatalog.filter((item) => item.category === category).forEach((item) => {
       const option = document.createElement("option");
       option.value = item.key;
-      option.textContent = `${item.label} · ${item.zone}`;
+      option.textContent = item.label;
       option.selected = item.key === selectedKey;
       group.append(option);
     });
@@ -130,18 +269,18 @@ function applyParameterInputs(rowIndex, key, useRecommended = true) {
   row.select.value = parameter.key;
   row.rangeMin.min = parameter.hard_min;
   row.rangeMin.max = parameter.hard_max;
-  row.rangeMin.step = parameter.step;
+  row.rangeMin.step = parameter.step || "any";
   row.rangeMax.min = parameter.hard_min;
   row.rangeMax.max = parameter.hard_max;
-  row.rangeMax.step = parameter.step;
+  row.rangeMax.step = parameter.step || "any";
   if (useRecommended) {
-    row.rangeMin.value = parameter.recommended_min;
-    row.rangeMax.value = parameter.recommended_max;
+    row.rangeMin.value = parameter.recommended_min ?? "";
+    row.rangeMax.value = parameter.recommended_max ?? "";
   }
   row.rangeUnitMin.textContent = parameter.unit;
   row.rangeUnitMax.textContent = parameter.unit;
   row.description.textContent = parameter.description;
-  row.safetyHint.textContent = `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
+  row.safetyHint.textContent = parameter.requires_range_confirmation ? "⚠ 无可靠推荐范围，请人工填写 MIN / MAX 并确认。" : `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
   const labels = selectedParameterKeys.map((selectedKey) => parameterByKey(selectedKey)?.label).filter(Boolean);
   elements.projectParameterLabel.textContent = labels.join(" × ");
   elements.monitorTitle.textContent = `${labels.join(" + ")}优化`;
@@ -154,7 +293,7 @@ function applyDirectParameter(rowIndex, key, useDefault = true) {
   row.select.value = parameter.key;
   row.value.min = parameter.hard_min;
   row.value.max = parameter.hard_max;
-  row.value.step = parameter.step;
+  row.value.step = parameter.step || "any";
   if (useDefault) row.value.value = parameter.default_value;
   row.unit.textContent = parameter.unit;
   row.rangeHint.textContent = `允许 ${parameter.hard_min}–${parameter.hard_max} ${parameter.unit}；建议范围 ${parameter.recommended_min}–${parameter.recommended_max} ${parameter.unit}。`;
@@ -163,27 +302,8 @@ function applyDirectParameter(rowIndex, key, useDefault = true) {
 function setInputValues(defaults, parameters) {
   if (initialized) return;
   parameterCatalog = parameters || [];
-  const defaultParameters = defaults.parameters || [
-    { parameter_key: defaults.parameter_key, range_min: defaults.range_min, range_max: defaults.range_max },
-    { parameter_key: "hot_inlet_temperature", range_min: 303.15, range_max: 353.15 },
-  ];
-  elements.parameterRows.forEach((row, index) => {
-    const selected = defaultParameters[index];
-    populateParameterSelect(row.select, selected.parameter_key);
-    applyParameterInputs(index, selected.parameter_key);
-    row.rangeMin.value = selected.range_min;
-    row.rangeMax.value = selected.range_max;
-  });
-  const directParameters = defaults.direct_parameters || defaultParameters.map((item) => ({
-    parameter_key: item.parameter_key,
-    value: parameterByKey(item.parameter_key)?.default_value,
-  }));
-  elements.directParameterRows.forEach((row, index) => {
-    const selected = directParameters[index];
-    populateParameterSelect(row.select, selected.parameter_key);
-    applyDirectParameter(index, selected.parameter_key);
-    row.value.value = selected.value;
-  });
+  const defaultParameters = defaults.parameters || [];
+  rebuildRows(defaultParameters, defaults.direct_parameters || []);
   elements.caseFile.value = defaults.case_file || "";
   elements.targetTrials.value = defaults.target_trials;
   elements.iterations.value = defaults.iterations;
@@ -238,7 +358,7 @@ function renderStatus(state) {
   const online = state.mcp.status === "online";
   elements.mcpDot.className = `status-dot ${online ? "" : "offline"}`;
   elements.footerFluentDot.className = `status-dot ${online ? "" : "offline"}`;
-  elements.mcpLabel.textContent = online ? "Fluent · 已连接" : "Fluent · 未连接";
+  elements.mcpLabel.textContent = online ? "MCP · 服务可达" : "MCP · 服务未连接";
   elements.mcpLabel.title = state.mcp.detail;
   elements.controlMode.textContent = state.server.control_mode;
   elements.footerFluent.textContent = online ? "Connected" : "Offline";
@@ -253,7 +373,7 @@ function renderStatus(state) {
   elements.runningPulse.classList.toggle("running", busy);
   elements.footerRunner.textContent = busy ? "Running" : failed ? "Failed" : "Idle";
 
-  const canRun = state.server.can_control && !busy;
+  const canRun = state.server.can_control && !busy && state.model?.execution_ready && state.model?.status !== "scanning";
   elements.runButton.disabled = !canRun || submitting;
   elements.runButtonLabel.textContent = busy ? "Fluent 正在运行" : "批准并开始实验";
   elements.directButton.disabled = !canRun || directSubmitting;
@@ -490,7 +610,7 @@ function renderAgentState(state) {
   const paragraph = elements.agentResult.querySelector("p");
   const time = elements.agentResult.querySelector("time");
   if (direct.status === "running") {
-    const parameter = parameterByKey(elements.directParameterSelect.value);
+    const parameter = parameterByKey(elements.directParameterRows[0]?.select.value);
     paragraph.textContent = `单点工况已提交。MCP 正在修改${parameter?.label || "所选参数"}、运行 Fluent 并生成温度云图。`;
     time.textContent = "Fluent 单点计算中";
   } else if (direct.status === "completed" && direct.result) {
@@ -524,8 +644,12 @@ async function refresh() {
     if (!response.ok) throw new Error(`状态接口返回 ${response.status}`);
     const state = await response.json();
     lastState = state;
+    const modelId = state.model?.profile?.model_id || null;
+    if (initialized && modelId !== renderedModelId) initialized = false;
     setInputValues(state.defaults, state.parameters);
-    elements.currentTaskLabel.textContent = `Mixing Elbow · ${state.task?.label || "参数研究"}`;
+    renderedModelId = modelId;
+    elements.currentTaskLabel.textContent = `${state.model?.profile?.name || "未选择模型"} · ${state.task?.label || "参数研究"}`;
+    renderModelState(state);
     const revision = state.task?.conversation_revision ?? 0;
     if (lastConversationRevision != null && revision !== lastConversationRevision) {
       clearConversationView();
@@ -545,18 +669,6 @@ async function refresh() {
 }
 
 elements.targetTrials.addEventListener("input", () => { elements.budgetTrials.textContent = elements.targetTrials.value || "—"; });
-elements.parameterRows.forEach((row, index) => {
-  row.select.addEventListener("change", () => {
-    applyParameterInputs(index, row.select.value);
-    renderCharts(lastState?.trials || []);
-    renderTable(lastState?.trials || []);
-    renderMetrics(lastState || { summary: {}, trials: [], job: {}, defaults: {} });
-  });
-});
-elements.directParameterRows.forEach((row, index) => {
-  row.select.addEventListener("change", () => applyDirectParameter(index, row.select.value));
-});
-
 elements.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   elements.formError.textContent = "";
@@ -567,7 +679,7 @@ elements.form.addEventListener("submit", async (event) => {
     range_max: Number(row.rangeMax.value),
   }));
   if (new Set(parameters.map((item) => item.parameter_key)).size !== parameters.length) {
-    elements.formError.textContent = "两个优化变量不能相同";
+    elements.formError.textContent = "优化变量不能相同";
     elements.parameterRows[1].select.focus();
     return;
   }
@@ -606,7 +718,7 @@ async function submitDirectRun(fromAgent = false) {
     value: Number(row.value.value),
   }));
   if (new Set(parameters.map((item) => item.parameter?.key)).size !== parameters.length) {
-    const message = "两个审计参数不能相同。";
+    const message = "审计参数不能相同。";
     elements.directError.textContent = message;
     if (fromAgent) addAgentMessage(message);
     return false;
@@ -639,7 +751,7 @@ async function submitDirectRun(fromAgent = false) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(apiErrorMessage(result, "单点计算启动失败"));
-    if (fromAgent) addAgentMessage(`已提交双参数组合：${parameters.map((item) => `${item.parameter.label} = ${item.value} ${item.parameter.unit}`).join("，")}。Fluent 将自动计算并返回温度云图。`);
+    if (fromAgent) addAgentMessage(`已提交参数组合：${parameters.map((item) => `${item.parameter.label} = ${item.value} ${item.parameter.unit}`).join("，")}。Fluent 将自动计算并返回温度云图。`);
     switchView("results");
     await refresh();
     return true;
@@ -687,29 +799,14 @@ function plannerReply(question) {
   if (/最优|结果|温度|trial/i.test(question) && trials.length) {
     return `当前共有 ${trials.length} 个有效 Trial，最佳出口温度为 ${formatNumber(lastState.summary?.best_value, 3)} K。你可以在“结果与产物”查看可审计文件。`;
   }
-  return "研究目标已记录。当前版本会把它映射到受控 ExperimentSpec，并要求你在“实验方案”页确认变量、目标和 Gate 后再执行。";
+  return "当前是规则助手，未调用大模型。请在模型页填写研究问题并生成推荐，核对参数、目标和 Gate 后再执行。";
 }
 
 function directParameterFromQuestion(question) {
   if (!/(设为|改为|改成|调整|提交|计算|运行|云图)/i.test(question)) return null;
-  const aliases = [
-    ["cold_inlet_velocity", /(cold[\s-]*inlet.*速度|冷入口.*速度)/i],
-    ["hot_inlet_velocity", /(hot[\s-]*inlet.*速度|热入口.*速度)/i],
-    ["cold_inlet_temperature", /(cold[\s-]*inlet.*温度|冷入口.*温度)/i],
-    ["hot_inlet_temperature", /(hot[\s-]*inlet.*温度|热入口.*温度)/i],
-    ["outlet_gauge_pressure", /(出口.*表压|出口.*压力|outlet.*pressure)/i],
-    ["cold_inlet_turbulence_intensity", /(冷入口.*湍流强度|cold.*turbulence)/i],
-    ["hot_inlet_turbulence_intensity", /(热入口.*湍流强度|hot.*turbulence)/i],
-    ["cold_inlet_hydraulic_diameter", /(冷入口.*水力直径|cold.*hydraulic)/i],
-    ["hot_inlet_hydraulic_diameter", /(热入口.*水力直径|hot.*hydraulic)/i],
-    ["air_density", /(空气.*密度|air.*density)/i],
-    ["air_viscosity", /(空气.*黏度|空气.*粘度|air.*viscosity)/i],
-    ["air_specific_heat", /(空气.*比热|air.*specific.*heat)/i],
-    ["air_thermal_conductivity", /(空气.*导热|air.*conductivity)/i],
-  ];
-  const selected = aliases.find(([, pattern]) => pattern.test(question));
+  const selected = parameterCatalog.find((item) => question.includes(item.label) || question.includes(item.key));
   const match = question.match(/(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/i);
-  return selected && match ? { key: selected[0], value: Number(match[1]) } : null;
+  return selected && match ? { key: selected.key, value: Number(match[1]) } : null;
 }
 
 elements.agentForm.addEventListener("submit", async (event) => {
@@ -719,12 +816,13 @@ elements.agentForm.addEventListener("submit", async (event) => {
   addAgentMessage(question, true);
   elements.agentQuestion.value = "";
   const directParameter = directParameterFromQuestion(question);
-  if (directParameter) {
+  if (directParameter && elements.directParameterRows.length) {
     const matchedIndex = elements.directParameterRows.findIndex((row) => row.select.value === directParameter.key);
     const rowIndex = matchedIndex >= 0 ? matchedIndex : 0;
     applyDirectParameter(rowIndex, directParameter.key, false);
     elements.directParameterRows[rowIndex].value.value = directParameter.value;
-    await submitDirectRun(true);
+    addAgentMessage("已把修改填入单点表单，请核对所有参数并点击计算。");
+    switchView("results");
     return;
   }
   window.setTimeout(() => addAgentMessage(plannerReply(question)), 220);
@@ -753,7 +851,7 @@ elements.newTaskButton.addEventListener("click", async () => {
     if (!response.ok) throw new Error(result.detail || "新建任务失败");
     initialized = false;
     parameterCatalog = [];
-    selectedParameterKeys = ["cold_inlet_velocity", "hot_inlet_temperature"];
+    selectedParameterKeys = [];
     lastState = null;
     clearConversationView();
     switchView("model");
@@ -764,10 +862,7 @@ elements.newTaskButton.addEventListener("click", async () => {
 });
 
 $("#accept-suggestion").addEventListener("click", () => switchView("plan"));
-$("#generate-plan").addEventListener("click", () => {
-  addAgentMessage("已根据当前模型和研究问题生成双参数温度优化方案。请检查两个变量的范围、质量守恒 Gate 与试验预算。" );
-  switchView("plan");
-});
+$("#generate-plan").addEventListener("click", () => analyzeModel(false));
 
 refresh();
 window.setInterval(refresh, 2000);

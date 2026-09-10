@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -29,161 +30,9 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "runs/fluent_demo_v01"
 DEFAULT_UI_DIR = PROJECT_ROOT / "integrations/fluent/ui"
 
 
-@dataclass(frozen=True)
-class UIParameter:
-    """One server-owned, user-selectable Fluent setting."""
-
-    key: str
-    label: str
-    category: str
-    zone: str
-    collection_path: str
-    object_name: str
-    property_path: str
-    unit: str
-    hard_min: float
-    hard_max: float
-    recommended_min: float
-    recommended_max: float
-    default_value: float
-    step: float
-    description: str
-    scale_to_native: float = 1.0
-    log: bool = False
-
-    def validate_display_value(self, value: float, label: str) -> float:
-        numeric = float(value)
-        if numeric < self.hard_min or numeric > self.hard_max:
-            raise ValueError(
-                f"{label} 必须在 {self.hard_min:g}–{self.hard_max:g} {self.unit} 之间"
-            )
-        return numeric
-
-    def native_value(self, display_value: float) -> float:
-        return float(display_value) * self.scale_to_native
-
-    def spec_dict(self, display_min: float, display_max: float) -> dict[str, Any]:
-        return {
-            "name": self.key,
-            "collection_path": self.collection_path,
-            "object_name": self.object_name,
-            "property_path": self.property_path,
-            "unit": self.unit,
-            "minimum": self.native_value(display_min),
-            "maximum": self.native_value(display_max),
-            "step": None
-            if self.log
-            else (self.step * self.scale_to_native if self.step else None),
-            "log": self.log,
-        }
-
-    def public_dict(self) -> dict[str, Any]:
-        return {
-            "key": self.key,
-            "label": self.label,
-            "category": self.category,
-            "zone": self.zone,
-            "unit": self.unit,
-            "hard_min": self.hard_min,
-            "hard_max": self.hard_max,
-            "recommended_min": self.recommended_min,
-            "recommended_max": self.recommended_max,
-            "default_value": self.default_value,
-            "step": self.step,
-            "description": self.description,
-            "log": self.log,
-            "native_to_display": 1.0 / self.scale_to_native,
-        }
-
-
-PARAMETER_CATALOG = (
-    UIParameter(
-        "cold_inlet_velocity", "冷入口速度", "边界条件", "cold-inlet",
-        "setup.boundary_conditions.velocity_inlet", "cold-inlet",
-        "momentum.velocity_magnitude.value", "m/s", 0.05, 10.0, 0.4, 1.1,
-        1.0, 0.05, "控制冷流体进入弯管的速度。",
-    ),
-    UIParameter(
-        "hot_inlet_velocity", "热入口速度", "边界条件", "hot-inlet",
-        "setup.boundary_conditions.velocity_inlet", "hot-inlet",
-        "momentum.velocity_magnitude.value", "m/s", 0.05, 10.0, 0.8, 1.6,
-        1.2, 0.05, "控制热流体进入弯管的速度。",
-    ),
-    UIParameter(
-        "cold_inlet_temperature", "冷入口温度", "边界条件", "cold-inlet",
-        "setup.boundary_conditions.velocity_inlet", "cold-inlet",
-        "thermal.temperature.value", "K", 250.0, 450.0, 283.15, 303.15,
-        293.15, 0.5, "设置冷入口的静温。",
-    ),
-    UIParameter(
-        "hot_inlet_temperature", "热入口温度", "边界条件", "hot-inlet",
-        "setup.boundary_conditions.velocity_inlet", "hot-inlet",
-        "thermal.temperature.value", "K", 250.0, 600.0, 303.15, 353.15,
-        313.15, 0.5, "设置热入口的静温。",
-    ),
-    UIParameter(
-        "outlet_gauge_pressure", "出口表压", "边界条件", "outlet",
-        "setup.boundary_conditions.pressure_outlet", "outlet",
-        "momentum.gauge_pressure.value", "Pa", -50000.0, 50000.0,
-        -1000.0, 1000.0, 0.0, 100.0, "设置压力出口相对于操作压力的表压。",
-    ),
-    UIParameter(
-        "cold_inlet_turbulence_intensity", "冷入口湍流强度", "湍流", "cold-inlet",
-        "setup.boundary_conditions.velocity_inlet", "cold-inlet",
-        "turbulence.turbulent_intensity", "%", 0.1, 30.0, 1.0, 10.0,
-        5.0, 0.1, "网页使用百分数；提交 Fluent 时自动换算为比例。", 0.01,
-    ),
-    UIParameter(
-        "hot_inlet_turbulence_intensity", "热入口湍流强度", "湍流", "hot-inlet",
-        "setup.boundary_conditions.velocity_inlet", "hot-inlet",
-        "turbulence.turbulent_intensity", "%", 0.1, 30.0, 1.0, 10.0,
-        5.0, 0.1, "网页使用百分数；提交 Fluent 时自动换算为比例。", 0.01,
-    ),
-    UIParameter(
-        "cold_inlet_hydraulic_diameter", "冷入口水力直径", "湍流", "cold-inlet",
-        "setup.boundary_conditions.velocity_inlet", "cold-inlet",
-        "turbulence.hydraulic_diameter", "m", 0.001, 2.0, 0.025, 0.15,
-        0.1016, 0.001, "用于强度–水力直径湍流入口定义。",
-    ),
-    UIParameter(
-        "hot_inlet_hydraulic_diameter", "热入口水力直径", "湍流", "hot-inlet",
-        "setup.boundary_conditions.velocity_inlet", "hot-inlet",
-        "turbulence.hydraulic_diameter", "m", 0.001, 2.0, 0.01, 0.08,
-        0.0254, 0.001, "用于强度–水力直径湍流入口定义。",
-    ),
-    UIParameter(
-        "air_density", "空气密度", "材料物性", "air",
-        "setup.materials.fluid", "air", "density.value", "kg/m³",
-        0.1, 5000.0, 0.8, 1.5, 1.225, 0.01, "修改当前 Case 中 air 材料的常密度。",
-    ),
-    UIParameter(
-        "air_viscosity", "空气动力黏度", "材料物性", "air",
-        "setup.materials.fluid", "air", "viscosity.value", "Pa·s",
-        1e-7, 10.0, 1e-5, 3e-5, 1.7894e-5, 1e-6,
-        "修改当前 Case 中 air 材料的常动力黏度。", log=True,
-    ),
-    UIParameter(
-        "air_specific_heat", "空气定压比热", "材料物性", "air",
-        "setup.materials.fluid", "air", "specific_heat.value", "J/(kg·K)",
-        100.0, 10000.0, 900.0, 1200.0, 1006.43, 10.0,
-        "修改当前 Case 中 air 材料的常定压比热。",
-    ),
-    UIParameter(
-        "air_thermal_conductivity", "空气导热系数", "材料物性", "air",
-        "setup.materials.fluid", "air", "thermal_conductivity.value", "W/(m·K)",
-        0.001, 1000.0, 0.015, 0.05, 0.0242, 0.001,
-        "修改当前 Case 中 air 材料的常导热系数。", log=True,
-    ),
-)
-PARAMETERS_BY_KEY = {parameter.key: parameter for parameter in PARAMETER_CATALOG}
-DEFAULT_PARAMETER_KEY = "cold_inlet_velocity"
-
-
-def _parameter(key: str) -> UIParameter:
-    try:
-        return PARAMETERS_BY_KEY[key]
-    except KeyError as exc:
-        raise ValueError("所选参数不在当前 Case 的受控白名单中") from exc
+from .adaptive import AdaptiveModels
+from .model_profile import UIParameter, MAX_PARAMETERS
+from .legacy_catalog import _parameter  # Compatibility for pre-discovery Python callers only.
 
 
 def _utc_now() -> str:
@@ -221,7 +70,7 @@ def _trial_documents(output_dir: Path) -> list[dict[str, Any]]:
 class ParameterRangeRequest(BaseModel):
     """One bounded parameter selected for a web optimization Campaign."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, allow_inf_nan=False, extra="forbid")
 
     parameter_key: str = Field(min_length=1, max_length=128)
     range_min: float
@@ -229,22 +78,47 @@ class ParameterRangeRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_range(self) -> ParameterRangeRequest:
-        parameter = _parameter(self.parameter_key)
-        parameter.validate_display_value(self.range_min, "参数下限")
-        parameter.validate_display_value(self.range_max, "参数上限")
         if self.range_min >= self.range_max:
             raise ValueError("参数上限必须大于下限")
         return self
 
 
-class RunRequest(BaseModel):
-    """Validated two-variable subset of the Fluent experiment contract."""
+class AnalyzeModelRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    case_file: str = Field(min_length=1, max_length=1024)
+    endpoint: str = Field(min_length=1, max_length=2048)
+    dimension: int = Field(default=3, ge=2, le=3)
+    product_version: str = Field(default="", pattern=r"^(?:[0-9]{2}\.[0-9](?:\.[0-9])?)?$")
+    question: str = Field(default="", max_length=4000)
+    force: bool = False
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    @model_validator(mode="after")
+    def validate_endpoint(self):
+        parsed = urlparse(self.endpoint)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("MCP 地址必须是无内嵌凭据的 HTTP(S) 地址")
+        return self
+
+
+class SaveRangesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    parameters: list[ParameterRangeRequest] = Field(min_length=1, max_length=MAX_PARAMETERS)
+
+    @model_validator(mode="after")
+    def unique(self):
+        if len({item.parameter_key for item in self.parameters}) != len(self.parameters):
+            raise ValueError("参数不能重复")
+        return self
+
+
+class RunRequest(BaseModel):
+    """Validated multi-variable subset of the Fluent experiment contract."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, allow_inf_nan=False, extra="forbid")
 
     case_file: str = Field(min_length=1, max_length=1024)
     target_trials: int = Field(ge=1, le=100)
-    parameters: list[ParameterRangeRequest] = Field(min_length=2, max_length=2)
+    parameters: list[ParameterRangeRequest] = Field(min_length=1, max_length=MAX_PARAMETERS)
     iterations: int = Field(ge=1, le=1_000_000)
     endpoint: str = Field(min_length=1, max_length=2048)
 
@@ -252,31 +126,30 @@ class RunRequest(BaseModel):
     def validate_distinct_parameters(self) -> RunRequest:
         keys = [item.parameter_key for item in self.parameters]
         if len(set(keys)) != len(keys):
-            raise ValueError("两个优化变量不能相同")
+            raise ValueError("优化变量不能相同")
         return self
 
 
 class DirectParameterValue(BaseModel):
     """One exact parameter value used by an audited direct run."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, allow_inf_nan=False, extra="forbid")
 
     parameter_key: str = Field(min_length=1, max_length=128)
     value: float
 
     @model_validator(mode="after")
     def validate_value(self) -> DirectParameterValue:
-        _parameter(self.parameter_key).validate_display_value(self.value, "参数值")
         return self
 
 
 class DirectRunRequest(BaseModel):
-    """Exact, bounded two-parameter run submitted from the local workbench."""
+    """Exact, bounded multi-parameter run submitted from the local workbench."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, allow_inf_nan=False, extra="forbid")
 
     case_file: str = Field(min_length=1, max_length=1024)
-    parameters: list[DirectParameterValue] = Field(min_length=2, max_length=2)
+    parameters: list[DirectParameterValue] = Field(min_length=1, max_length=MAX_PARAMETERS)
     iterations: int = Field(ge=1, le=1_000_000)
     endpoint: str = Field(min_length=1, max_length=2048)
 
@@ -284,7 +157,7 @@ class DirectRunRequest(BaseModel):
     def validate_distinct_parameters(self) -> DirectRunRequest:
         keys = [item.parameter_key for item in self.parameters]
         if len(set(keys)) != len(keys):
-            raise ValueError("两个审计参数不能相同")
+            raise ValueError("审计参数不能相同")
         return self
 
 
@@ -308,30 +181,11 @@ def _default_form(raw: dict[str, Any]) -> dict[str, Any]:
         case_file = os.environ.get("FLUENT_CASE_FILE", "")
     optimization = raw.get("optimization") or {}
     solver = raw.get("solver") or {}
-    selected = _parameter(DEFAULT_PARAMETER_KEY)
-    second = _parameter("hot_inlet_temperature")
     return {
         "case_file": case_file,
         "target_trials": int(optimization.get("target_trials", 6)),
-        "parameter_key": selected.key,
-        "range_min": selected.recommended_min,
-        "range_max": selected.recommended_max,
-        "parameters": [
-            {
-                "parameter_key": selected.key,
-                "range_min": selected.recommended_min,
-                "range_max": selected.recommended_max,
-            },
-            {
-                "parameter_key": second.key,
-                "range_min": second.recommended_min,
-                "range_max": second.recommended_max,
-            },
-        ],
-        "direct_parameters": [
-            {"parameter_key": selected.key, "value": selected.default_value},
-            {"parameter_key": second.key, "value": second.default_value},
-        ],
+        "parameters": [],
+        "direct_parameters": [],
         "iterations": int(solver.get("iterations", 100)),
         "endpoint": os.environ.get(
             "FLUENT_MCP_ENDPOINT",
@@ -343,7 +197,7 @@ def _default_form(raw: dict[str, Any]) -> dict[str, Any]:
 def _restore_form_from_campaign(
     defaults: dict[str, Any], output_dir: Path
 ) -> None:
-    """Restore restart-safe case and two-parameter values from the audit trail."""
+    """Restore restart-safe case and multi-parameter values from the audit trail."""
 
     campaign = _read_json(output_dir / "campaign.json") or {}
     payload = campaign.get("payload")
@@ -352,52 +206,12 @@ def _restore_form_from_campaign(
     baseline = payload.get("baseline")
     if isinstance(baseline, dict) and baseline.get("path"):
         defaults["case_file"] = str(baseline["path"])
-    raw_parameters = payload.get("parameters")
-    if not isinstance(raw_parameters, list):
-        return
-    parameters = []
-    for raw_parameter in raw_parameters[:2]:
-        if not isinstance(raw_parameter, dict):
-            continue
-        key = str(raw_parameter.get("name", ""))
-        if key not in PARAMETERS_BY_KEY:
-            continue
-        catalog = _parameter(key)
-        factor = 1.0 / catalog.scale_to_native
-        parameters.append(
-            {
-                "parameter_key": key,
-                "range_min": float(raw_parameter["minimum"]) * factor,
-                "range_max": float(raw_parameter["maximum"]) * factor,
-            }
-        )
-    if len(parameters) != 2:
-        return
-    defaults["parameters"] = parameters
-    summary = _read_json(output_dir / "demo_summary.json") or {}
-    best = summary.get("best_params")
-    if not isinstance(best, dict):
-        best = {}
-    defaults["direct_parameters"] = [
-        {
-            "parameter_key": item["parameter_key"],
-            "value": float(
-                best.get(
-                    item["parameter_key"],
-                    _parameter(item["parameter_key"]).native_value(
-                        _parameter(item["parameter_key"]).default_value
-                    ),
-                )
-            )
-            / _parameter(item["parameter_key"]).scale_to_native,
-        }
-        for item in parameters
-    ]
 
 
-def build_run_spec(spec_path: Path, form: RunRequest) -> ExperimentSpec:
+def build_run_spec(spec_path: Path, form: RunRequest, catalog: dict[str, UIParameter] | None = None) -> ExperimentSpec:
     """Apply the UI's bounded fields to the full audited experiment template."""
 
+    lookup = (lambda key: catalog[key]) if catalog is not None else _parameter
     raw = _load_raw_spec(spec_path)
     connection = dict(raw.get("connection") or {})
     connect_kwargs = dict(connection.get("connect_kwargs") or {})
@@ -410,7 +224,7 @@ def build_run_spec(spec_path: Path, form: RunRequest) -> ExperimentSpec:
 
     selected_parameters = [
         (
-            _parameter(item.parameter_key),
+            lookup(item.parameter_key),
             item.range_min,
             item.range_max,
         )
@@ -424,7 +238,7 @@ def build_run_spec(spec_path: Path, form: RunRequest) -> ExperimentSpec:
         {
             "name": "baseline",
             "values": {
-                parameter.key: parameter.native_value(parameter.default_value)
+                parameter.key: parameter.native_value(min(max(parameter.default_value, _range_min), _range_max))
                 for parameter, _range_min, _range_max in selected_parameters
             },
         }
@@ -444,10 +258,11 @@ def build_run_spec(spec_path: Path, form: RunRequest) -> ExperimentSpec:
 
 
 def build_direct_run_spec(
-    spec_path: Path, form: DirectRunRequest
+    spec_path: Path, form: DirectRunRequest, catalog: dict[str, UIParameter] | None = None
 ) -> ExperimentSpec:
     """Build one exact point while retaining the audited Fluent path allowlist."""
 
+    lookup = (lambda key: catalog[key]) if catalog is not None else _parameter
     raw = _load_raw_spec(spec_path)
     connection = dict(raw.get("connection") or {})
     connect_kwargs = dict(connection.get("connect_kwargs") or {})
@@ -468,7 +283,7 @@ def build_direct_run_spec(
     raw["connection"] = connection
 
     selected_parameters = [
-        (_parameter(item.parameter_key), item.value) for item in form.parameters
+        (lookup(item.parameter_key), item.value) for item in form.parameters
     ]
     raw["parameters"] = [
         parameter.spec_dict(parameter.hard_min, parameter.hard_max)
@@ -485,7 +300,7 @@ def build_direct_run_spec(
     raw["task_name"] = "AutoFluentWebDirectParameterRun"
     raw["design_points"] = [
         {
-            "name": "direct-two-parameter-audit",
+            "name": "direct-parameter-audit",
             "values": native_values,
         }
     ]
@@ -703,7 +518,7 @@ class WebRuntime:
         )
 
     async def start_direct(
-        self, spec: ExperimentSpec, form: DirectRunRequest
+        self, spec: ExperimentSpec, form: DirectRunRequest, catalog: dict[str, UIParameter] | None = None
     ) -> None:
         self.refresh_task()
         self.refresh_direct_task()
@@ -717,13 +532,16 @@ class WebRuntime:
         self.direct_finished_at = None
         self.direct_error = None
         self.direct_result = None
+        lookup = (lambda key: catalog[key]) if catalog is not None else _parameter
         selected_parameters = [
-            (_parameter(item.parameter_key), item.value) for item in form.parameters
+            (lookup(item.parameter_key), item.value) for item in form.parameters
         ]
         classification = (
             "baseline_range"
             if all(
-                parameter.recommended_min <= value <= parameter.recommended_max
+                parameter.recommended_min is not None
+                and parameter.recommended_max is not None
+                and parameter.recommended_min <= value <= parameter.recommended_max
                 for parameter, value in selected_parameters
             )
             else "out_of_baseline_range"
@@ -774,9 +592,62 @@ def create_app(
     defaults = _default_form(raw_spec)
     _restore_form_from_campaign(defaults, runtime.output_dir)
     initial_defaults = dict(defaults)
+    models = AdaptiveModels(output, raw_spec)
+    models.restore_selection(runtime.output_dir)
+    models.apply_defaults(defaults)
+    control_lock = asyncio.Lock()
 
     app = FastAPI(title="Vegapunk Fluent Lab", version="0.1.0")
     app.state.fluent_runtime = runtime
+    app.state.adaptive_models = models
+
+    @app.middleware("http")
+    async def same_origin_mutations(request: Request, call_next):
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            origin = request.headers.get("origin")
+            if (request.headers.get("sec-fetch-site") == "cross-site"
+                    or (origin and origin.rstrip("/") != str(request.base_url).rstrip("/"))):
+                return JSONResponse(status_code=403, content={"detail": "拒绝跨站控制请求"})
+        return await call_next(request)
+
+    @app.get("/api/models")
+    async def model_library() -> dict:
+        return {"models": [{"model_id": item["model_id"], "name": item["name"],
+                            "case_file": item["case_file"], "fluent_version": item["fluent_version"],
+                            "product_version": item.get("product_version", ""),
+                            "dimension": item["dimension"], "updated_at": item["updated_at"]}
+                           for item in models.store.list()]}
+
+    @app.post("/api/models/analyze")
+    async def analyze_model(request: Request, form: AnalyzeModelRequest) -> dict:
+        if not runtime.can_control(request):
+            raise HTTPException(status_code=403, detail="远程页面为只读")
+        if control_lock.locked() or runtime.is_busy():
+            raise HTTPException(status_code=409, detail="已有模型扫描或计算正在运行")
+        try:
+            async with control_lock:
+                profile, cached = await models.analyze(**form.model_dump())
+                # Changing model is a task boundary: do not mix previous Trial results.
+                if (runtime.output_dir / "campaign.json").exists() or _trial_documents(runtime.output_dir) or runtime.direct_result:
+                    runtime.new_task()
+                models.persist_selection(runtime.output_dir)
+                models.apply_defaults(defaults)
+            return {"profile": profile, "cached": cached}
+        except (RuntimeError, ValueError, OSError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/api/models/ranges")
+    async def save_model_ranges(request: Request, form: SaveRangesRequest) -> dict:
+        if not runtime.can_control(request):
+            raise HTTPException(status_code=403, detail="远程页面为只读")
+        if control_lock.locked() or runtime.is_busy():
+            raise HTTPException(status_code=409, detail="请等待当前操作完成")
+        try:
+            models.save_ranges(form.parameters, runtime.output_dir)
+            models.apply_defaults(defaults)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"saved": True}
 
     @app.get("/api/state")
     async def get_state(request: Request) -> dict[str, Any]:
@@ -820,7 +691,8 @@ def create_app(
                 "conversation_revision": runtime.conversation_revision,
                 "archives": runtime.archived_tasks[-20:],
             },
-            "parameters": [item.public_dict() for item in PARAMETER_CATALOG],
+            "parameters": [item.public_dict() for item in models.catalog().values()],
+            "model": models.state(),
             "mcp": {"endpoint": endpoint, **mcp},
             "defaults": defaults,
             "summary": summary,
@@ -835,8 +707,14 @@ def create_app(
                 detail="远程页面为只读；请在运行服务的电脑上打开本机地址",
             )
         try:
-            spec = build_run_spec(spec_file, form)
-            await runtime.start(spec, form.target_trials)
+            async with control_lock:
+                if runtime.is_busy():
+                    raise RuntimeError("已有计算正在运行")
+                catalog = await models.validate_run(form)
+                spec = models.bind_connection(build_run_spec(spec_file, form, catalog))
+                models.save_ranges(form.parameters, runtime.output_dir)
+                await runtime.start(spec, form.target_trials)
+                models.record_run(runtime.output_dir)
         except (SpecError, RuntimeError, ValueError) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         defaults.update(form.model_dump())
@@ -852,8 +730,13 @@ def create_app(
                 detail="远程页面为只读；请在运行服务的电脑上提交计算",
             )
         try:
-            spec = build_direct_run_spec(spec_file, form)
-            await runtime.start_direct(spec, form)
+            async with control_lock:
+                if runtime.is_busy():
+                    raise RuntimeError("已有计算正在运行")
+                catalog = await models.validate_run(form)
+                spec = models.bind_connection(build_direct_run_spec(spec_file, form, catalog))
+                await runtime.start_direct(spec, form, catalog)
+                models.record_run(runtime.output_dir)
         except (SpecError, RuntimeError, ValueError) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         defaults.update(
@@ -878,11 +761,15 @@ def create_app(
         if not runtime.can_control(request):
             raise HTTPException(status_code=403, detail="远程页面为只读")
         try:
+            if models.busy or control_lock.locked():
+                raise RuntimeError("模型扫描或提交正在进行")
             task_record = runtime.new_task()
+            models.profile = None
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         defaults.clear()
         defaults.update(initial_defaults)
+        models.apply_defaults(defaults)
         return {"created": True, "task": task_record}
 
     @app.get(

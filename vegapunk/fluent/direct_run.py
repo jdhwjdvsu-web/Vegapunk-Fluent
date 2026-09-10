@@ -105,7 +105,7 @@ def build_direct_temperature_code(
     """Build fixed-shape solver and contour code from validated inputs."""
 
     point = DesignPointSpec(
-        name="direct-two-parameter-audit",
+        name="direct-parameter-audit",
         values=parameter_values,
     )
     solver_code = build_evaluate_point_code(spec, point).rstrip()
@@ -140,8 +140,8 @@ async def run_direct_temperature_case(
 ) -> dict[str, Any]:
     """Run one exact point through PyFluent-MCP and persist its contour."""
 
-    if len(spec.parameters) != 2:
-        raise FluentExperimentError("direct run requires exactly two parameters")
+    if not spec.parameters:
+        raise FluentExperimentError("direct run requires at least one parameter")
     if spec.optimization is None:
         raise FluentExperimentError("direct run requires mass-balance configuration")
     expected = {parameter.name: parameter for parameter in spec.parameters}

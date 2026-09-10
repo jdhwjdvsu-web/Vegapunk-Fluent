@@ -204,3 +204,14 @@ docs/README.md
 
 # Local Ansys Fluent transcripts
 /fluent-*.trn
+
+# Local Fluent adaptive-development artifacts
+/.scratch/
+/deliverables/
+/CURRENT_TASK_CONTEXT.md
+/runs/adaptive_validation/
+/runs/fluent_demo_v01/model_library/
+/runs/fluent_demo_v01/web_tasks/
+/runs/fluent_demo_v01/campaign.json
+/runs/fluent_demo_v01/final_info.json
+/runs/fluent_demo_v01/optimization_summary.json

@@ -1,5 +1,18 @@
 # Vegapunk / PyFluent-MCP integration
 
+## Adaptive parameters milestone (2026-09-07)
+
+The Web workbench now discovers its parameter catalog from the selected Case via
+read-only MCP introspection. It supports 1–5 parameters, rule-based Top-2 ranking,
+saved ranges and a SHA256/version-aware SQLite model library. New Cases are not
+allowed to inherit the Mixing Elbow objective or gates: automatic Objective/Gate
+adaptation remains the next milestone. See
+[implementation, usage and live evidence](../../docs/Fluent_Adaptive_实施与使用.md).
+
+The previous fixed catalog is retained only for legacy Python-call compatibility;
+an unscanned Web model exposes no parameters. The current assistant is a rule-based
+planner, not an LLM agent.
+
 This implementation uses the official
 [ansys/pyfluent-mcp](https://github.com/ansys/pyfluent-mcp) server.
 
