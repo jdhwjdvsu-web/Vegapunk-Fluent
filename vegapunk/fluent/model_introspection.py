@@ -1,4 +1,8 @@
-"""Read-only, fixed-shape model scanner executed through validated MCP code."""
+"""Fixed-shape scanner with an opt-in strictly read-only planning mode.
+
+Legacy scans retain their existing vector probe for compatibility. Planning
+must explicitly select strict_read_only=True, which never includes that probe.
+"""
 from __future__ import annotations
 
 import json
@@ -7,16 +11,17 @@ from pathlib import Path
 from .direct_run import _call
 from .parameter_rules import RULES, collection_path
 from .runner import FluentExperimentError
+from .pressure_direction import probe_code, read_only_probe_code
 
-SCANNER_VERSION = "1.0"
+SCANNER_VERSION = "1.4"
 MARKER = "VEGAPUNK_MODEL="
 BOUNDARIES = ("velocity_inlet", "pressure_inlet", "mass_flow_inlet", "pressure_outlet", "outflow", "wall", "symmetry", "interior", "interface", "periodic")
 
 
-def build_introspection_code() -> str:
+def build_introspection_code(*, strict_read_only: bool = False) -> str:
     lines = [
         "import json",
-        "__vp_model = {'boundaries': [], 'materials': [], 'physics': {}, 'reports': [], 'observations': [], 'warnings': []}",
+        "__vp_model = {'boundaries': [], 'materials': [], 'physics': {}, 'solver_readbacks': {}, 'reports': [], 'observations': [], 'warnings': []}",
     ]
 
     def probe(statement: str, label: str) -> None:
@@ -36,14 +41,27 @@ def build_introspection_code() -> str:
         "multiphase": "solver.settings.setup.models.multiphase.model.get_state()",
     }.items():
         probe(f"__vp_model['physics'][{key!r}] = {expression}", key)
+    probe(
+        "__vp_model['solver_readbacks']['pseudo_time_formulation'] = "
+        "solver.settings.solution.methods.pseudo_time_method.formulation.segregated_solver.get_state()",
+        "pseudo time formulation",
+    )
+    probe(
+        "__vp_model['solver_readbacks']['pseudo_time_courant_number'] = "
+        "solver.settings.solution.controls.pseudo_time_method_local_time_step."
+        "pseudo_time_courant_number.get_state()",
+        "pseudo time courant",
+    )
     for kind in BOUNDARIES:
         probe(f"for __vp_name in solver.settings.setup.boundary_conditions.{kind}.get_object_names():\n    __vp_model['boundaries'].append({{'name': __vp_name, 'type': {kind!r}}})", kind)
     for kind in ("fluid", "solid"):
         probe(f"for __vp_name in solver.settings.setup.materials.{kind}.get_object_names():\n    __vp_model['materials'].append({{'name': __vp_name, 'type': {kind!r}}})", kind)
     probe("__vp_model['reports'] = solver.settings.solution.report_definitions.get_state()", "reports")
-    probe("__vp_model['cell_zones'] = solver.settings.setup.cell_zone_conditions.fluid.get_object_names()", "cell zones")
+    probe("__vp_model['cell_zones'] = [{'name': name, 'type': 'fluid'} for name in solver.settings.setup.cell_zone_conditions.fluid.get_object_names()] + [{'name': name, 'type': 'solid'} for name in solver.settings.setup.cell_zone_conditions.solid.get_object_names()]", "cell zones")
     probe("__vp_model['physics']['porous_zones'] = [name for name in solver.settings.setup.cell_zone_conditions.fluid.get_object_names() if solver.settings.setup.cell_zone_conditions.fluid[name].porous_zone.porous.get_state() is True]", "porous media")
     for rule in RULES:
+        if rule.id.startswith("flow_direction_"):
+            continue  # vector components are probed as a complete atomic group below
         base = f"solver.settings.{collection_path(rule)}[__vp_name]"
         node = f"{base}.{rule.path}"
         checks = f"{node}.is_active() and not {node}.is_read_only()"
@@ -52,19 +70,25 @@ def build_introspection_code() -> str:
         statement = f"for __vp_name in solver.settings.{collection_path(rule)}.get_object_names():\n"
         statement += "    try:\n"
         statement += f"        if {checks}:\n"
-        statement += f"            __vp_model['observations'].append({{'rule_id': {rule.id!r}, 'object_name': __vp_name, 'value': {node}.get_state(), 'native_min': {node}.min(), 'native_max': {node}.max(), 'editable': True}})\n"
+        statement += f"            __vp_model['observations'].append({{'rule_id': {rule.id!r}, 'collection': {rule.collection!r}, 'object_name': __vp_name, 'value': {node}.get_state(), 'native_min': {node}.min(), 'native_max': {node}.max(), 'editable': True}})\n"
         statement += "    except Exception as __vp_error:\n"
         statement += f"        __vp_model['warnings'].append({rule.id!r} + ':' + __vp_name + ': ' + str(__vp_error)[:160])"
         probe(statement, rule.id)
+    if strict_read_only:
+        lines.extend(read_only_probe_code().splitlines())
+    else:
+        lines.extend(probe_code().splitlines())
     lines.append(f"print({MARKER!r} + json.dumps(__vp_model, allow_nan=False))")
     return "\n".join(lines) + "\n"
 
 
-async def scan_model(endpoint: str, connect_kwargs: dict, audit_dir: Path) -> dict:
+async def scan_model(
+    endpoint: str, connect_kwargs: dict, audit_dir: Path, *, strict_read_only: bool = False
+) -> dict:
     from fastmcp import Client
 
     audit_dir.mkdir(parents=True, exist_ok=True)
-    code = build_introspection_code()
+    code = build_introspection_code(strict_read_only=strict_read_only)
     (audit_dir / "introspection.py").write_text(code, encoding="utf-8")
     owned = False
     async with Client(endpoint, timeout=600) as client:

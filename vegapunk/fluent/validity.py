@@ -132,7 +132,10 @@ def evaluate_result_gate(spec: ExperimentSpec, result: Mapping[str, Any]) -> Gat
         diverged = True
 
     numeric_values: dict[str, float] = {}
-    for key in ("objective_value", "mass_flow_in", "mass_flow_out"):
+    numeric_keys = ["objective_value"]
+    if spec.optimization.enable_legacy_mass_balance:
+        numeric_keys.extend(["mass_flow_in", "mass_flow_out"])
+    for key in numeric_keys:
         try:
             value = float(result[key])
             passed = math.isfinite(value)
@@ -177,6 +180,13 @@ def evaluate_result_gate(spec: ExperimentSpec, result: Mapping[str, Any]) -> Gat
             diverged = True
 
     monitor_history = result.get("monitor_history")
+    if spec.solver.thermal_guard:
+        thermal = result.get('thermal_guard')
+        passed = isinstance(thermal, Mapping) and thermal.get('required') is True and thermal.get('passed') is True
+        checks.append({'name': 'thermal_window', 'passed': passed, 'details': thermal})
+        if not passed:
+            reasons.append('thermal window convergence checks missing or failed')
+            diverged = True
     if not isinstance(monitor_history, Mapping):
         monitor_history = {}
     for monitor in spec.optimization.numerical_monitors:

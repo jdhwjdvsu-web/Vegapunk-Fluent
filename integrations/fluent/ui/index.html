@@ -3,113 +3,123 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Vegapunk-Fluent AI Scientist Simulation Workbench" />
-    <title>Vegapunk-Fluent · 科研任务工作台</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232864dc'/><path d='M8 9l8 16 8-16h-5l-3 8-3-8z' fill='white'/></svg>" />
-    <link rel="stylesheet" href="/assets/app.css?v=20260907-adaptive1" />
+    <meta name="description" content="Vegapunk-Fluent 实验规划与执行工作台" />
+    <title>Vegapunk · Fluent 实验工作台</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%231a493c'/><path d='M8 9l8 16 8-16h-5l-3 8-3-8z' fill='white'/></svg>" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260920-v31-acceptance" />
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="/" aria-label="Vegapunk-Fluent 首页"><span class="brand-mark">V</span><span class="brand-name">Vegapunk<span>-Fluent</span></span></a>
-      <div class="top-context"><span class="context-label">当前任务</span><strong id="current-task-label">Mixing Elbow · 参数研究</strong></div>
-      <div class="top-status" aria-live="polite"><span id="mcp-dot" class="status-dot muted"></span><span id="mcp-label">正在检测 Fluent</span><span id="control-mode" class="mode-badge">—</span></div>
+      <a class="brand" href="/" aria-label="Vegapunk 首页"><span class="brand-mark">V</span><span class="brand-name">Vegapunk <b>Fluent</b></span></a>
+      <div class="top-context"><span>当前任务</span><strong id="current-task-label">等待载入模型</strong></div>
+      <div class="top-actions" aria-live="polite"><span id="mcp-dot" class="status-dot muted"></span><span id="mcp-label">检测 Fluent</span><span id="control-mode" class="mode-badge">—</span><button id="agent-toggle" class="icon-button" type="button" aria-label="打开实验助手">AI</button></div>
     </header>
 
+    <div id="preview-notice" class="preview-notice" hidden>当前为样例数据预览，不会连接或执行真实 Fluent。</div>
+
     <div class="app-shell">
-      <nav class="project-nav" aria-label="科研任务导航">
-        <div class="nav-title"><p>科研任务</p><button id="new-task-button" type="button" aria-label="新建任务" title="归档当前任务并新建">＋</button></div>
-        <section class="project-card"><span class="project-icon">ME</span><div><strong>Mixing Elbow</strong><small id="project-parameter-label">参数研究</small></div><span class="project-state">当前</span></section>
-        <p class="nav-section-label">工作区</p>
-        <button class="nav-item" type="button" data-view="model"><span class="nav-icon">◇</span><span>模型与数据</span><span id="model-check" class="nav-check">✓</span></button>
-        <button class="nav-item" type="button" data-view="plan"><span class="nav-icon">⌘</span><span>实验方案</span><span class="nav-count">1</span></button>
-        <button class="nav-item active" type="button" data-view="monitor"><span class="nav-icon">↗</span><span>实验监控</span><span id="running-pulse" class="nav-pulse"></span></button>
-        <button class="nav-item" type="button" data-view="results"><span class="nav-icon">▦</span><span>结果与产物</span><span id="result-count" class="nav-count">0</span></button>
-        <div class="workflow-mini"><p>执行链路</p><ol><li class="done"><span></span>Vegapunk 规划</li><li class="done"><span></span>Optuna 采样</li><li class="active"><span></span>Fluent Runner</li><li><span></span>Validity Gate</li></ol></div>
-        <div class="advanced-link"><span>专家工具</span><button type="button" data-view="plan" data-open-advanced="true">高级模式 →</button></div>
+      <nav class="project-nav" aria-label="实验工作流">
+        <div class="nav-title"><span>实验工作流</span><button id="new-task-button" type="button" aria-label="新建任务">＋</button></div>
+        <section class="project-card"><span class="project-icon">CFD</span><div><strong>当前实验</strong><small id="project-parameter-label">等待模型</small></div></section>
+        <button class="nav-item active" type="button" data-view="model"><span class="nav-index">1</span><span><strong>定义任务</strong><small>模型与研究目标</small></span><i id="model-check">·</i></button>
+        <button class="nav-item" type="button" data-view="plan"><span class="nav-index">2</span><span><strong>审查方案</strong><small>变量、映射与预算</small></span><i>·</i></button>
+        <button class="nav-item" type="button" data-view="monitor"><span class="nav-index">3</span><span><strong>运行监控</strong><small>进度与质量门禁</small></span><i id="running-pulse">·</i></button>
+        <button class="nav-item" type="button" data-view="results"><span class="nav-index">4</span><span><strong>结果交付</strong><small>最佳点与产物</small></span><i id="result-count">0</i></button>
+        <div class="nav-note"><span>安全边界</span><p>Agent 只生成结构化方案；批准后才进入执行链路。</p></div>
       </nav>
 
       <main class="workbench">
-        <section id="view-monitor" class="view active" aria-labelledby="monitor-title">
-          <header class="view-header">
-            <div><div class="title-line"><h1 id="monitor-title">参数优化</h1><span id="job-badge" class="job-badge idle"><i></i>待命</span></div><p>最小化出口平均温度，同时满足质量守恒与有限值检查。</p></div>
-            <div class="header-actions"><button class="secondary-button" type="button" data-view="plan">查看方案</button><button class="primary-button compact" type="button" data-view="plan">继续实验</button></div>
-          </header>
-          <section class="progress-card">
-            <div class="progress-copy"><span>EXPERIMENT PROGRESS</span><strong><span id="completed-value">0</span><small id="target-value"> / 0 trials</small></strong></div>
-            <div class="progress-main"><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div><p id="progress-caption">等待实验数据</p></div>
-            <div class="best-inline"><span>BEST OBJECTIVE</span><strong><span id="best-temperature">—</span><small> K</small></strong><p><span id="best-velocity">—</span> <b id="best-parameter-unit">—</b> · <span id="best-trial">—</span></p></div>
-          </section>
-          <section class="monitor-grid">
-            <article class="data-card chart-card"><div class="card-heading"><div><h2>目标函数历史</h2><p>Outlet temperature / trial</p></div><span id="objective-trend" class="trend-badge">—</span></div><div id="objective-chart" class="chart" role="img" aria-label="出口温度随试验变化曲线"><div class="empty-state">完成试验后显示目标函数历史</div></div></article>
-            <article class="data-card chart-card"><div class="card-heading"><div><h2>参数空间</h2><p id="parameter-chart-subtitle">Parameter / outlet temperature</p></div><span id="trial-count" class="quiet-label">0 points</span></div><div id="parameter-chart" class="chart" role="img" aria-label="参数与出口温度散点图"><div class="empty-state">等待有效参数点</div></div></article>
-          </section>
-          <section class="data-card trials-card" aria-labelledby="trial-title">
-            <div class="card-heading table-heading"><div><h2 id="trial-title">Trial 记录</h2><p>Gate 负责隔离无效、约束失败与发散结果</p></div><div class="gate-legend"><span class="pass">PASS</span><span class="warn">CONSTRAINT</span><span class="fail">DIVERGED</span></div></div>
-            <div class="table-wrap"><table><thead><tr><th>Trial</th><th>Sampling</th><th id="trial-parameter-header">Parameter</th><th>Objective</th><th>Mass balance</th><th>Duration</th><th>Gate</th></tr></thead><tbody id="trial-table"><tr><td colspan="7" class="table-empty">暂无试验记录</td></tr></tbody></table></div>
-          </section>
-        </section>
+        <section id="view-model" class="view active" aria-labelledby="model-title">
+          <header class="view-header"><div><p class="eyebrow">01 · DEFINE</p><h1 id="model-title">先说清楚要研究什么</h1><p>选择 Fluent 基线 Case，并用自然语言描述目标。Agent 会整理成可审查的实验任务。</p></div></header>
+          <div class="define-grid">
+            <article class="surface model-card">
+              <div class="section-heading"><div><span class="step-mark">1</span><div><h2>基线模型</h2><p>读取参数与指标目录，不修改 Case。</p></div></div><span id="model-scan-status" class="state-chip">尚未分析</span></div>
+              <div class="model-summary"><span class="file-mark">CAS</span><div><strong id="model-name">选择 .cas / .cas.h5</strong><p id="model-path">尚未载入路径</p></div></div>
+              <label class="field"><span>Case 路径</span><input id="model-case-path" type="text" placeholder="D:\cases\example.cas.h5" /></label>
+              <div class="field-grid"><label class="field"><span>维度</span><select id="model-dimension"><option value="3">3D</option><option value="2">2D</option></select></label><label class="field"><span>Fluent 版本（可选）</span><input id="model-version" placeholder="例如 25.2.0" /></label></div>
+              <div class="button-row"><button id="analyze-model" class="primary-button" type="button">分析模型</button><button id="force-analyze" class="secondary-button" type="button">重新分析</button></div>
+              <details class="quiet-details"><summary>从最近模型选择</summary><select id="model-library" aria-label="选择历史模型"><option value="">请选择</option></select></details>
+            </article>
 
-        <section id="view-model" class="view" aria-labelledby="model-title">
-          <header class="view-header"><div><p class="kicker">STEP 01</p><h1 id="model-title">模型与实验数据</h1><p>先建立可追溯的 Fluent 基线，再由 Agent 生成实验方案。</p></div></header>
-          <section class="setup-grid">
-            <article class="setup-card model-loaded"><div class="setup-step">01</div><span class="setup-icon">◇</span><h2>Fluent 模型</h2><strong id="model-name">mixing_elbow.cas.h5</strong><p id="model-path">等待载入路径</p><p id="model-scan-status" role="status">尚未分析模型</p>
-<label>Case 路径<input id="model-case-path" type="text" placeholder="D:\\cases\\example.cas.h5" /></label>
-<label>维度<select id="model-dimension"><option value="3">3D</option><option value="2">2D</option></select></label>
-<label>Fluent 版本（可选，填写后启用版本缓存）<input id="model-version" placeholder="例如 25.2.0" /></label>
-<button id="analyze-model" class="primary-button" type="button">分析模型</button>
-<button id="force-analyze" class="secondary-button" type="button">强制重新分析</button>
-<details><summary>模型库 / 最近模型</summary><select id="model-library" aria-label="选择历史模型"><option value="">请选择</option></select></details></article>
-            <article class="setup-card"><div class="setup-step">02</div><span class="setup-icon">▤</span><h2>实验数据</h2><strong>可选校准数据</strong><p>CSV / Excel / 历史实验结果</p><div class="drop-zone"><span>＋</span><strong>选择数据文件</strong><small>当前 walking skeleton 尚未启用数据上传</small></div></article>
-          </section>
-          <article class="research-goal-card"><div><p class="kicker">RESEARCH QUESTION</p><h2>告诉 Agent 你想研究什么</h2><p>自然语言会被整理为可审查的 ExperimentSpec，而不是直接执行任意代码。</p></div><textarea id="goal-input" rows="4">研究冷入口流速与热入口温度对混合弯管出口平均温度的共同影响，在满足质量守恒误差小于 0.1% 的前提下，寻找最低出口温度。</textarea><div class="goal-actions"><span>V1 支持 1～5 个数值参数；目标与 Gate 必须确认</span><button class="primary-button" type="button" id="generate-plan">生成实验方案 →</button></div></article>
+            <article class="surface goal-card">
+              <div class="section-heading"><div><span class="step-mark">2</span><div><h2>研究目标</h2><p>包含变量、目标和工程约束会更准确。</p></div></div></div>
+              <textarea id="goal-input" rows="8" placeholder="例如：研究冷入口速度和热入口温度对出口平均温度的影响，在质量守恒误差小于 0.1% 的条件下寻找最低值。"></textarea>
+              <div class="prompt-examples"><span>快速示例</span><button type="button" data-prompt="研究冷入口速度对出口平均温度的影响，在质量守恒误差小于 0.1% 的前提下寻找最低出口温度。">入口速度</button><button type="button" data-prompt="研究压力入口方向角对升力系数和阻力系数的影响，寻找最大升阻比。">来流角度</button><button type="button" data-prompt="评估 NACA0012 几何攻角优化任务，先确认当前 Fluent 能否原生控制该变量；不能时给出代理映射和几何交接建议。">几何能力</button></div>
+              <p id="goal-error" class="inline-error" role="alert"></p>
+              <div class="goal-footer"><span>生成后可逐项核对，不会自动运行。</span><button class="primary-button prominent" type="button" id="generate-plan">生成实验方案 <b>→</b></button></div>
+            </article>
+          </div>
         </section>
 
         <section id="view-plan" class="view" aria-labelledby="plan-title">
-          <header class="view-header"><div><p class="kicker">STEP 02 · AGENT GENERATED</p><h1 id="plan-title">实验方案确认</h1><p>批准前请核对变量、目标、Gate 和计算预算。</p></div><span class="review-badge">等待批准</span></header>
+          <header class="view-header"><div><p class="eyebrow">02 · REVIEW</p><h1 id="plan-title">审查 Agent 的实验方案</h1><p>重点确认变量如何落到 Fluent、目标指标是否可读，以及本次计算预算。</p></div><span id="approval-badge" class="review-badge">等待方案</span></header>
+
+          <section id="agent-v3-card" class="surface agent-v3-card" aria-labelledby="agent-v3-title">
+            <div class="section-heading"><div><span class="agent-mark">A</span><div><p class="eyebrow">LANGGRAPH · AGENT V3</p><h2 id="agent-v3-title">实验规划</h2></div></div><div class="planner-status"><small id="agent-progress-label">尚未开始</small><span id="agent-v3-status" class="state-chip">等待任务</span><button id="agent-attempt-cancel" class="text-button compact" type="button" hidden>取消规划</button><button id="agent-attempt-retry" class="text-button compact" type="button" hidden>重试</button></div></div>
+            <p id="agent-v3-message" class="agent-v3-message">在“定义任务”中提交研究目标后，这里会显示结构化任务、变量分类和映射审查结果。</p>
+            <div id="agent-v3-questions" class="notice warning" hidden></div>
+            <div id="agent-v3-errors" class="notice danger" hidden></div>
+            <div class="overview-grid">
+              <article><span class="overview-label">任务理解</span><div id="task-overview" class="overview-content"><p>等待 Agent 解析研究目标。</p></div></article>
+              <article><span class="overview-label">变量与能力</span><div id="agent-v3-bindings" class="agent-v3-bindings"><p>尚无变量分类。</p></div></article>
+              <article><span class="overview-label">Fluent 映射</span><div id="mapping-overview" class="overview-content"><p>尚无映射验证。</p></div></article>
+            </div>
+            <details class="contract-details"><summary>查看结构化契约</summary><div class="contract-grid"><article><h3>SimulationTaskObject</h3><pre id="agent-v3-task">等待自然语言任务</pre></article><article><h3>MappingSpec / Reviewer</h3><pre id="agent-v3-mappings">尚无代理映射</pre></article><article><h3>ResolvedTaskObject</h3><pre id="agent-v3-resolved">审批前将在此显示最终冻结对象</pre></article></div></details>
+          </section>
+
           <form id="run-form" class="plan-layout" novalidate>
             <div class="plan-main">
-              <article class="plan-section"><div class="plan-number">01</div><div class="plan-content"><h2>优化变量</h2><p>每个 Trial 同时修改所选参数。默认推荐 2 个，支持 1～5 个，不可重复。</p><div id="parameter-list" class="parameter-list"></div><button id="add-parameter" class="secondary-button" type="button">＋ 添加优化变量</button><button id="save-ranges" class="secondary-button" type="button">保存范围</button></div></article>
-              <article class="plan-section"><div class="plan-number">02</div><div class="plan-content"><h2>目标</h2><p id="contract-status" role="status">请先分析模型；以下为既有验收模板，新模型不能直接沿用。</p><div class="objective-row"><span class="direction-tag min">MIN</span><div><strong>Outlet temperature average</strong><small>出口面 · surface-areaavg · temperature</small></div></div></div></article>
-              <article class="plan-section"><div class="plan-number">03</div><div class="plan-content"><h2>质量与安全 Gate</h2><div class="constraint-list"><div><span class="gate-icon pass">✓</span><p><strong>Mass imbalance</strong><small>相对误差 &lt; 0.1%</small></p></div><div><span class="gate-icon pass">✓</span><p><strong>Finite outputs</strong><small>目标值与报告值必须为有限数</small></p></div><div><span class="gate-icon neutral">○</span><p><strong>Residual threshold</strong><small>当前 Demo 仅记录，不作为拒绝条件</small></p></div></div></div></article>
-              <details id="advanced-settings" class="advanced-settings"><summary>高级设置 <span>Connection · Solver · Optimization</span></summary><div class="advanced-grid"><label><span>Fluent case 文件</span><input id="case-file" name="case_file" type="text" placeholder="C:\cases\mixing_elbow.cas.h5" required /></label><label><span>MCP 地址</span><input id="endpoint" name="endpoint" type="url" required /></label><label><span>目标试验数</span><input id="target-trials" name="target_trials" type="number" min="1" max="100" required /></label><label><span>每次求解迭代</span><input id="iterations" name="iterations" type="number" min="1" max="1000000" required /></label></div></details>
+              <div id="plan-mode-note" class="mode-note">生成 V3 方案后，这里会切换为 Agent 审批模式。</div>
+              <article id="v3-plan-snapshot" class="surface plan-section v3-plan-snapshot" hidden>
+                <div class="plan-heading v3-plan-heading"><span>🔒</span><div><h2>已冻结的执行方案</h2><p>运行只会采用这里显示的 V3 参数；下方高级设置在此模式下不可直接改写。</p></div><button id="v3-edit-plan" class="secondary-button" type="button">修改方案</button></div>
+                <div id="v3-plan-values" class="v3-snapshot-grid" aria-live="polite"></div>
+              </article>
+              <article id="v3-revision-panel" class="surface plan-section v3-revision-panel" hidden>
+                <div class="plan-heading"><span>✎</span><div><h2>修改并重新规划</h2><p>提交后会重新生成并校验 ResolvedTaskObject；旧审批立即失效，且不会自动执行。</p></div></div>
+                <div id="v3-revision-variables" class="v3-revision-variables"></div>
+                <div class="v3-revision-budget">
+                  <label class="field"><span>最大试验数</span><input id="v3-revision-trials" type="number" min="1" max="100" step="1" /></label>
+                  <label class="field"><span>每次求解迭代</span><input id="v3-revision-iterations" type="number" min="1" max="1000000" step="1" /></label>
+                </div>
+                <label class="field v3-revision-notes"><span>其他修改要求（可选）</span><textarea id="v3-revision-notes" rows="3" placeholder="例如：保持风扇曲线、材料和质量守恒门槛不变。"></textarea></label>
+                <p id="v3-revision-error" class="inline-error" role="alert"></p>
+                <div class="button-row v3-revision-actions"><button id="v3-revision-submit" class="primary-button" type="button">重新生成并校验方案</button><button id="v3-revision-cancel" class="text-button" type="button">取消</button></div>
+              </article>
+              <div id="legacy-plan-editor">
+                <article class="surface plan-section"><div class="plan-heading"><span>01</span><div><h2>优化变量</h2><p>支持 1–5 个数值变量，不可重复。</p></div></div><div id="parameter-list" class="parameter-list"></div><div class="button-row"><button id="add-parameter" class="secondary-button" type="button">＋ 添加变量</button><button id="save-ranges" class="secondary-button" type="button">保存范围</button></div></article>
+                <article class="surface plan-section"><div class="plan-heading"><span>02</span><div><h2>目标指标</h2><p id="contract-status" role="status">请先分析模型。</p></div></div><div class="objective-row"><label class="field"><span>指标</span><select id="objective-metric" required></select></label><label class="field"><span>方向</span><select id="objective-direction"><option value="minimize">最小化</option><option value="maximize">最大化</option></select></label><p id="objective-description">等待模型指标</p></div></article>
+                <article class="surface plan-section"><div class="plan-heading"><span>03</span><div><h2>质量门禁</h2><p>异常结果不会进入最优候选。</p></div></div><div class="constraint-list"><label class="gate-choice"><input id="mass-balance-check" type="checkbox" /><span><strong>质量守恒</strong><small>默认相对误差 &lt; 0.1%</small></span></label><div><i>✓</i><span><strong>有限值检查</strong><small>拒绝 NaN / Inf</small></span></div><div><i>○</i><span><strong>收敛检查</strong><small>按求解配置判断</small></span></div></div></article>
+              </div>
+              <details id="advanced-settings" class="surface advanced-settings"><summary>高级执行设置 <span>连接、求解与优化预算</span></summary><div class="advanced-grid"><label class="field"><span>Fluent case 文件</span><input id="case-file" name="case_file" type="text" placeholder="D:\cases\example.cas.h5" required /></label><label class="field"><span>MCP 地址</span><input id="endpoint" name="endpoint" type="url" required /></label><label class="field"><span>目标试验数</span><input id="target-trials" name="target_trials" type="number" min="1" max="1000" required /></label><label class="field"><span>每次求解迭代</span><input id="iterations" name="iterations" type="number" min="1" max="1000000" required /></label></div></details>
             </div>
-            <aside class="run-summary"><p class="kicker">COMPUTE BUDGET</p><h2>Optuna / TPE</h2><dl><div><dt>Trials</dt><dd id="budget-trials">6</dd></div><div><dt>Startup</dt><dd>2 random</dd></div><div><dt>Execution</dt><dd>Serial</dd></div><div><dt>Resume</dt><dd>SQLite</dd></div></dl><p id="form-note" class="form-note">每个 Trial 都会重载同一基线模型，并写入可审计产物。</p><div id="form-error" class="form-error" role="alert"></div><button id="run-button" class="primary-button approve" type="submit"><span id="run-button-label">批准并开始实验</span><span>→</span></button><button class="secondary-button full" type="button" data-view="model">返回修改研究目标</button></aside>
+            <aside class="run-summary surface"><p class="eyebrow">COMPUTE BUDGET</p><h2>本次执行</h2><dl><div><dt>试验数</dt><dd id="budget-trials">6</dd></div><div><dt>采样器</dt><dd>Optuna / TPE</dd></div><div><dt>执行方式</dt><dd>串行</dd></div><div><dt>恢复能力</dt><dd>SQLite</dd></div></dl><p id="form-note" class="form-note">每个 Trial 会重载受保护的基线模型，并保存可审计产物。</p><div id="form-error" class="inline-error" role="alert"></div><button id="run-button" class="primary-button approve" type="submit"><span id="run-button-label">批准并开始实验</span><b>→</b></button><button class="text-button" type="button" data-view="model">返回修改研究目标</button></aside>
           </form>
         </section>
 
+        <section id="view-monitor" class="view" aria-labelledby="monitor-title">
+          <header class="view-header"><div><p class="eyebrow">03 · RUN</p><div class="title-line"><h1 id="monitor-title">实验运行监控</h1><span id="job-badge" class="job-badge idle"><i></i>待命</span></div><p id="monitor-objective-summary">批准方案后在这里查看进度、目标历史与质量门禁。</p></div><button class="secondary-button" type="button" data-view="plan">查看方案</button></header>
+          <section class="surface progress-card"><div><span>完成进度</span><strong><b id="completed-value">0</b><small id="target-value"> / 0 trials</small></strong></div><div class="progress-main"><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div><p id="progress-caption">等待实验数据</p></div><div class="best-inline"><span>当前最佳</span><strong><b id="best-temperature">—</b><small id="best-objective-unit"></small></strong><p><span id="best-velocity">—</span> <b id="best-parameter-unit">—</b> · <span id="best-trial">—</span></p></div></section>
+          <section class="monitor-grid"><article class="surface data-card"><div class="card-heading"><div><h2>目标函数历史</h2><p id="objective-chart-subtitle">Objective / trial</p></div><span id="objective-trend" class="quiet-chip">—</span></div><div id="objective-chart" class="chart" role="img" aria-label="目标函数随试验变化曲线"><div class="empty-state">完成试验后显示趋势</div></div></article><article class="surface data-card"><div class="card-heading"><div><h2>参数空间</h2><p id="parameter-chart-subtitle">Parameter / objective</p></div><span id="trial-count" class="quiet-chip">0 points</span></div><div id="parameter-chart" class="chart" role="img" aria-label="参数空间散点图"><div class="empty-state">等待有效参数点</div></div></article></section>
+          <section class="surface data-card trials-card" aria-labelledby="trial-title"><div class="card-heading"><div><h2 id="trial-title">Trial 记录</h2><p>失败、约束不满足与发散结果会被隔离。</p></div><div class="gate-legend"><span class="pass">通过</span><span class="warn">约束</span><span class="fail">失败</span></div></div><div class="table-wrap"><table><thead><tr><th>Trial</th><th>采样</th><th id="trial-parameter-header">参数</th><th>目标</th><th>质量指标</th><th>耗时</th><th>Gate</th></tr></thead><tbody id="trial-table"><tr><td colspan="7" class="table-empty">暂无试验记录</td></tr></tbody></table></div></section>
+        </section>
+
         <section id="view-results" class="view" aria-labelledby="results-title">
-          <header class="view-header"><div><p class="kicker">STEP 04</p><h1 id="results-title">结果与可审计产物</h1><p>把最佳结果、有效 Trial 与底层计算记录放在同一个交付面。</p></div></header>
-          <section class="direct-run-card" aria-labelledby="direct-run-title">
-            <div class="direct-run-copy"><p class="kicker">DIRECT FLUENT CONTROL</p><h2 id="direct-run-title">参数审计与温度云图</h2><p>从当前模型目录选择参数并输入精确值。网页会重新载入基准 Case，通过 MCP 修改所选参数、计算并读取 Fluent 原生云图。</p><span>每次复算都会保存参数组合、求解报告、Gate 与云图。</span></div>
-            <form id="direct-run-form" class="direct-run-form">
-              <div id="direct-parameter-list"></div><button id="add-direct-parameter" class="secondary-button" type="button">＋ 添加参数</button>
-              <button id="direct-run-button" class="primary-button" type="submit"><span id="direct-run-button-label">计算并生成云图</span><span>→</span></button>
-              <p id="direct-run-error" class="direct-run-error" role="alert"></p>
-            </form>
-            <div id="direct-run-result" class="direct-run-result" hidden>
-              <div class="direct-metrics"><div><span>出口平均温度</span><strong><b id="direct-temperature">—</b> K</strong></div><div><span>质量守恒误差</span><strong id="direct-mass-error">—</strong></div><div><span>计算状态</span><strong id="direct-gate">—</strong></div></div>
-              <img id="direct-contour" alt="Fluent 生成的静温云图" />
-              <p id="direct-caption">等待 Fluent 云图。</p>
-            </div>
-          </section>
-          <section class="result-hero"><div><span>BEST OUTLET TEMPERATURE</span><strong><span id="result-best-temp">—</span><small> K</small></strong><p>对应 <span id="result-parameter-label">参数</span> <b id="result-best-velocity">—</b> <span id="result-parameter-unit">—</span></p></div><div class="result-verdict"><span class="gate-icon pass">✓</span><div><strong>结果通过 Gate</strong><p>可进入报告与后续工程判断</p></div></div></section>
-          <article class="next-step-card"><div><p class="kicker">AGENT NEXT STEP</p><h2>建议扩大最优点附近的搜索密度</h2><p id="result-insight">等待有效结果后生成建议。</p></div><button class="primary-button" type="button" data-view="plan">创建后续实验 →</button></article>
+          <header class="view-header"><div><p class="eyebrow">04 · DELIVER</p><h1 id="results-title">结果与产物</h1><p>最佳候选、独立复算结果和下一步建议集中在这里。</p></div></header>
+          <section class="surface result-hero"><div><span id="result-objective-label">最佳目标值</span><strong><b id="result-best-temp">—</b><small id="result-objective-unit"></small></strong><p><span id="result-parameter-label">参数</span> <b id="result-best-velocity">—</b> <span id="result-parameter-unit">—</span></p></div><div class="result-verdict"><i>✓</i><div><strong id="verification-title">等待有效结果</strong><p id="verification-detail">候选点独立复算后才会标记为已复核。</p></div></div></section>
+          <article class="surface next-step-card"><div><p class="eyebrow">AGENT NEXT STEP</p><h2>下一步建议</h2><p id="result-insight">等待有效结果后生成建议。</p></div><button class="secondary-button" type="button" data-view="plan">创建后续实验 →</button></article>
+          <article class="surface geometry-recommendation-card"><div><p class="eyebrow">GEOMETRY HANDOFF</p><h2>几何修改建议</h2><p>只生成可审查的交接建议，不会自动操作 Workbench。</p><div id="geometry-overview" class="overview-content"><p>等待几何类变量或优化结果。</p></div></div><details><summary>查看完整 GeometryRecommendation</summary><pre id="geometry-recommendation">存在通过独立复算的代理最优解后，将显示 GeometryRecommendation。</pre></details></article>
+          <details class="surface direct-run-card"><summary><span><small>专家工具</small><strong id="direct-run-title">单点复算与温度云图</strong></span><b>展开</b></summary><div class="direct-run-body"><p>从当前模型目录选择参数并输入精确值。每次复算都会保存参数组合、报告、Gate 和云图。</p><form id="direct-run-form" class="direct-run-form"><div id="direct-parameter-list"></div><button id="add-direct-parameter" class="secondary-button" type="button">＋ 添加参数</button><button id="direct-run-button" class="primary-button" type="submit"><span id="direct-run-button-label">计算并生成云图</span><b>→</b></button><p id="direct-run-error" class="inline-error" role="alert"></p></form><div id="direct-run-result" class="direct-run-result" hidden><div class="direct-metrics"><div><span>出口平均温度</span><strong><b id="direct-temperature">—</b> K</strong></div><div><span>质量守恒误差</span><strong id="direct-mass-error">—</strong></div><div><span>计算状态</span><strong id="direct-gate">—</strong></div></div><img id="direct-contour" alt="Fluent 生成的静温云图" /><p id="direct-caption">等待 Fluent 云图。</p></div></div></details>
         </section>
       </main>
 
-      <aside class="agent-panel" aria-labelledby="agent-title">
-        <header><div><span class="agent-avatar">A</span><div><h2 id="agent-title">Agent 助手</h2><p>规则推荐 · 非大模型</p></div></div><div class="agent-header-actions"><button id="clear-conversation" type="button" title="仅清空当前对话">清空对话</button><span class="planner-badge">受控执行</span></div></header>
-        <div id="agent-thread" class="agent-thread" aria-live="polite">
-          <article class="agent-message"><span>A</span><div><p>请先分析 Case。参数目录来自模型扫描，推荐不等于工程批准。</p><time>模型检查</time></div></article>
-          <article class="agent-message"><span>A</span><div><p>默认推荐两个常用参数，你可以替换、增加或删除。</p><button id="accept-suggestion" type="button">查看建议方案</button><time>方案建议</time></div></article>
-          <article id="agent-result-message" class="agent-message"><span>A</span><div><p>正在等待实验状态…</p><time>实时监控</time></div></article>
-        </div>
-        <form id="agent-form" class="agent-input"><label for="agent-question">描述目标、询问结果或提交单点计算</label><textarea id="agent-question" rows="3" placeholder="例如：将 cold-inlet 设为 10 m/s，提交计算并生成温度云图"></textarea><div><span>Enter 发送 · Shift+Enter 换行</span><button type="submit" aria-label="发送">↑</button></div></form>
-        <p class="agent-disclaimer">规则助手只准备参数；计算须在表单明确提交。不接收任意代码。</p>
+      <aside id="agent-panel" class="agent-panel open" aria-labelledby="agent-title">
+        <header><div class="agent-identity"><span class="agent-avatar">A</span><div><h2 id="agent-title">实验助手</h2><p id="agent-mode">检查模型连接…</p></div></div><div class="agent-header-actions"><button id="clear-conversation" type="button">清空</button><button id="agent-close" type="button" aria-label="关闭实验助手">×</button></div></header>
+        <div id="agent-thread" class="agent-thread" aria-live="polite"><article class="agent-message"><span>A</span><div><p>先选择一个 Case，再告诉我你想研究的变量、目标和约束。我会把它整理成可审查方案。</p><time>开始</time></div></article><article id="agent-result-message" class="agent-message"><span>A</span><div><p>正在等待实验状态…</p><button id="accept-suggestion" type="button">查看建议方案</button><time>状态</time></div></article></div>
+        <form id="agent-form" class="agent-input"><label for="agent-question">向实验助手提问</label><textarea id="agent-question" rows="3" placeholder="例如：为什么这个变量需要代理映射？"></textarea><div><span>结构化规划 · 可审查</span><button id="agent-submit" type="submit" aria-label="发送">↑</button></div></form><p class="agent-disclaimer">AI 建议需要工程人员确认后执行。</p>
       </aside>
     </div>
 
-    <footer class="runtime-bar" aria-label="运行状态"><div><span class="runtime-label">TRIAL</span><strong id="footer-trial">0 / 0</strong></div><div><span id="footer-fluent-dot" class="status-dot muted"></span><span>Fluent</span><strong id="footer-fluent">Checking</strong></div><div><span>Runner</span><strong id="footer-runner">Idle</strong></div><div><span>Gate</span><strong id="footer-gate">—</strong></div><div class="runtime-right"><span id="updated-at">等待数据</span></div></footer>
-    <script src="/assets/app.js?v=20260907-adaptive1" defer></script>
+    <footer class="runtime-bar"><div><span>Trial</span><strong id="footer-trial">—</strong></div><div><i id="footer-fluent-dot" class="status-dot muted"></i><strong id="footer-fluent">Fluent 未连接</strong></div><div><span>Runner</span><strong id="footer-runner">待命</strong></div><div><span>Gate</span><strong id="footer-gate">等待</strong></div><div class="runtime-right">更新于 <strong id="updated-at">—</strong></div></footer>
+    <script src="/assets/app.js?v=20260920-v31-acceptance" defer></script>
   </body>
 </html>

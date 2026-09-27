@@ -109,6 +109,11 @@ class ConnectionSpec:
     baseline_sha256: str | None = None
     connect_kwargs: dict[str, Any] = field(default_factory=dict)
     client_timeout_seconds: int = 300
+    # The FastMCP client default, short tools, connection establishment, and a
+    # submitted solver transaction have different latency budgets.
+    tool_timeout_seconds: int = 60
+    connect_timeout_seconds: int = 300
+    solve_timeout_seconds: int = 1800
     allow_remote_endpoint: bool = False
     reuse_existing_session: bool = False
     disconnect_on_exit: bool = True
@@ -161,12 +166,25 @@ class ConnectionSpec:
             raise SpecError(
                 "connection.client_timeout_seconds must be between 1 and 86400"
             )
+        tool_timeout = int(raw.get("tool_timeout_seconds", 60))
+        connect_timeout = int(raw.get("connect_timeout_seconds", 300))
+        solve_timeout = int(raw.get("solve_timeout_seconds", 1800))
+        for label, value in (
+            ("tool_timeout_seconds", tool_timeout),
+            ("connect_timeout_seconds", connect_timeout),
+            ("solve_timeout_seconds", solve_timeout),
+        ):
+            if not 1 <= value <= 86400:
+                raise SpecError(f"connection.{label} must be between 1 and 86400")
         return cls(
             endpoint=endpoint,
             job_endpoint=job_endpoint,
             baseline_sha256=baseline_sha256,
             connect_kwargs=kwargs,
             client_timeout_seconds=timeout,
+            tool_timeout_seconds=tool_timeout,
+            connect_timeout_seconds=connect_timeout,
+            solve_timeout_seconds=solve_timeout,
             allow_remote_endpoint=allow_remote,
             reuse_existing_session=bool(raw.get("reuse_existing_session", False)),
             disconnect_on_exit=bool(raw.get("disconnect_on_exit", True)),
@@ -279,13 +297,19 @@ class ReportSpec:
     locations: tuple[str, ...]
     report_type: str | None = None
     field_name: str | None = None
+    numerator_report: str | None = None
+    denominator_report: str | None = None
+    epsilon: float = 1e-12
+    unit: str | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any], index: int) -> ReportSpec:
         prefix = f"reports[{index}]"
         kind = _non_empty_string(raw.get("kind"), f"{prefix}.kind").lower()
-        if kind not in {"surface", "flux"}:
-            raise SpecError(f"{prefix}.kind must be 'surface' or 'flux'")
+        if kind not in {"surface", "volume", "flux", "existing", "derived_ratio"}:
+            raise SpecError(
+                f"{prefix}.kind must be surface, volume, flux, existing, or derived_ratio"
+            )
         locations_raw = raw.get("locations")
         if not isinstance(locations_raw, list) or not locations_raw:
             raise SpecError(f"{prefix}.locations must be a non-empty list")
@@ -296,21 +320,52 @@ class ReportSpec:
         # ``field`` is the public JSON key; ``field_name`` keeps dataclass
         # round-trips compatible with ``ExperimentSpec.to_dict()``.
         field_name = raw.get("field", raw.get("field_name"))
-        if kind == "surface" and (report_type is None or field_name is None):
-            raise SpecError(f"{prefix} surface reports require report_type and field")
+        if kind in {"surface", "volume"} and (
+            report_type is None or field_name is None
+        ):
+            raise SpecError(
+                f"{prefix} {kind} reports require report_type and field"
+            )
+        report_type_value = (
+            _non_empty_string(report_type, f"{prefix}.report_type")
+            if report_type is not None
+            else None
+        )
+        if kind == "existing" and report_type_value not in {"lift", "drag"}:
+            raise SpecError(f"{prefix} existing report_type must be lift or drag")
+        numerator = raw.get("numerator_report")
+        denominator = raw.get("denominator_report")
+        if kind == "derived_ratio" and (numerator is None or denominator is None):
+            raise SpecError(f"{prefix} derived_ratio requires numerator_report and denominator_report")
+        numerator_value = (
+            _non_empty_string(numerator, f"{prefix}.numerator_report")
+            if numerator is not None else None
+        )
+        denominator_value = (
+            _non_empty_string(denominator, f"{prefix}.denominator_report")
+            if denominator is not None else None
+        )
+        if numerator_value is not None and numerator_value == denominator_value:
+            raise SpecError(f"{prefix} ratio numerator and denominator must differ")
+        epsilon = _number(raw.get("epsilon", 1e-12), f"{prefix}.epsilon")
+        if epsilon <= 0:
+            raise SpecError(f"{prefix}.epsilon must be positive")
         return cls(
             name=_non_empty_string(raw.get("name"), f"{prefix}.name"),
             kind=kind,
             locations=locations,
-            report_type=(
-                _non_empty_string(report_type, f"{prefix}.report_type")
-                if report_type is not None
-                else None
-            ),
+            report_type=report_type_value,
             field_name=(
                 _non_empty_string(field_name, f"{prefix}.field")
                 if field_name is not None
                 else None
+            ),
+            numerator_report=numerator_value,
+            denominator_report=denominator_value,
+            epsilon=epsilon,
+            unit=(
+                _non_empty_string(raw.get("unit"), f"{prefix}.unit")
+                if raw.get("unit") is not None else None
             ),
         )
 
@@ -364,6 +419,8 @@ class SolverSpec:
     initialization: str = "hybrid"
     iterations: int = 100
     residual_thresholds: dict[str, float] = field(default_factory=dict)
+    thermal_guard: dict[str, Any] | None = None
+    iteration_chunk_size: int | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> SolverSpec:
@@ -372,9 +429,16 @@ class SolverSpec:
         ).lower()
         if initialization not in {"hybrid", "standard", "none"}:
             raise SpecError("solver.initialization must be hybrid, standard, or none")
-        iterations = int(raw.get("iterations", 100))
+        iterations_raw = raw.get("iterations", 100)
+        if isinstance(iterations_raw, bool):
+            raise SpecError("solver.iterations must not be bool")
+        iterations = int(iterations_raw)
         if not 1 <= iterations <= 1_000_000:
             raise SpecError("solver.iterations must be between 1 and 1000000")
+        chunk_raw = raw.get("iteration_chunk_size")
+        if chunk_raw is not None:
+            if isinstance(chunk_raw, bool) or not isinstance(chunk_raw, int) or not 1 <= chunk_raw <= iterations:
+                raise SpecError("solver.iteration_chunk_size must be an integer within the iteration limit")
         thresholds_raw = _mapping(
             raw.get("residual_thresholds", {}), "solver.residual_thresholds"
         )
@@ -386,10 +450,21 @@ class SolverSpec:
         }
         if any(value <= 0 for value in thresholds.values()):
             raise SpecError("residual thresholds must be greater than zero")
+        from .thermal_guard import validate_thermal_guard
+        try:
+            thermal_guard = validate_thermal_guard(raw.get('thermal_guard'))
+        except ValueError as exc:
+            raise SpecError(str(exc)) from exc
+        if thermal_guard and (initialization != 'none' or iterations <= thermal_guard['window'] or not thresholds):
+            raise SpecError('thermal_guard requires pinned continuation, initialization=none, residual thresholds and iterations > window')
+        if thermal_guard and chunk_raw is not None:
+            raise SpecError('thermal_guard has its own fixed iteration window; iteration_chunk_size is unsupported')
         return cls(
             initialization=initialization,
             iterations=iterations,
             residual_thresholds=thresholds,
+            thermal_guard=thermal_guard,
+            iteration_chunk_size=chunk_raw,
         )
 
 
@@ -476,17 +551,26 @@ class OptimizationSpec:
     mass_flow_out_report: str = "mass-flow-out"
     mass_balance_relative_tolerance: float = 0.001
     mass_balance_epsilon: float = 1e-12
+    enable_legacy_mass_balance: bool = True
     verify_invalid_parameter_gate: bool = True
     max_attempts_per_trial: int = 2
     heartbeat_seconds: float = 2.0
     trial_timeout_seconds: float = 3600.0
     conservation_checks: tuple[ConservationSpec, ...] = ()
     numerical_monitors: tuple[NumericalMonitorSpec, ...] = ()
+    max_wall_time_seconds: float | None = None
+    no_improvement_trials: int | None = None
+    target_objective: float | None = None
+    maximum_failed_trials: int | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> OptimizationSpec:
-        target_trials = int(raw.get("target_trials", cls.target_trials))
-        startup_trials = int(raw.get("n_startup_trials", cls.n_startup_trials))
+        target_trials_raw = raw.get("target_trials", cls.target_trials)
+        startup_trials_raw = raw.get("n_startup_trials", cls.n_startup_trials)
+        if isinstance(target_trials_raw, bool) or isinstance(startup_trials_raw, bool):
+            raise SpecError("optimization Trial counts must not be bool")
+        target_trials = int(target_trials_raw)
+        startup_trials = int(startup_trials_raw)
         tolerance = _number(
             raw.get(
                 "mass_balance_relative_tolerance",
@@ -550,6 +634,28 @@ class OptimizationSpec:
             )
             for index, value in enumerate(monitors_raw)
         )
+        max_wall_time = raw.get("max_wall_time_seconds")
+        if max_wall_time is not None:
+            max_wall_time = _number(max_wall_time, "optimization.max_wall_time_seconds")
+            if not 0 < max_wall_time <= 7 * 24 * 3600:
+                raise SpecError("optimization.max_wall_time_seconds must be in (0, 604800]")
+        no_improvement = raw.get("no_improvement_trials")
+        if no_improvement is not None:
+            if isinstance(no_improvement, bool):
+                raise SpecError("optimization.no_improvement_trials must not be bool")
+            no_improvement = int(no_improvement)
+            if not 1 <= no_improvement <= target_trials:
+                raise SpecError("optimization.no_improvement_trials must be between one and target_trials")
+        target_objective = raw.get("target_objective")
+        if target_objective is not None:
+            target_objective = _number(target_objective, "optimization.target_objective")
+        maximum_failed = raw.get("maximum_failed_trials")
+        if maximum_failed is not None:
+            if isinstance(maximum_failed, bool):
+                raise SpecError("optimization.maximum_failed_trials must not be bool")
+            maximum_failed = int(maximum_failed)
+            if not 0 <= maximum_failed <= 1000:
+                raise SpecError("optimization.maximum_failed_trials must be between zero and 1000")
         return cls(
             study_name=_non_empty_string(
                 raw.get("study_name", cls.study_name), "optimization.study_name"
@@ -567,6 +673,9 @@ class OptimizationSpec:
             ),
             mass_balance_relative_tolerance=tolerance,
             mass_balance_epsilon=epsilon,
+            enable_legacy_mass_balance=bool(
+                raw.get("enable_legacy_mass_balance", True)
+            ),
             verify_invalid_parameter_gate=bool(
                 raw.get("verify_invalid_parameter_gate", True)
             ),
@@ -575,6 +684,10 @@ class OptimizationSpec:
             trial_timeout_seconds=trial_timeout,
             conservation_checks=conservation_checks,
             numerical_monitors=numerical_monitors,
+            max_wall_time_seconds=max_wall_time,
+            no_improvement_trials=no_improvement,
+            target_objective=target_objective,
+            maximum_failed_trials=maximum_failed,
         )
 
 
@@ -591,6 +704,7 @@ class ExperimentSpec:
     parameter_constraints: tuple[ParameterConstraintSpec, ...] = ()
     constraints: tuple[ConstraintSpec, ...] = ()
     optimization: OptimizationSpec | None = None
+    execution_contract: dict[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, raw_value: Mapping[str, Any]) -> ExperimentSpec:
@@ -693,6 +807,12 @@ class ExperimentSpec:
             if optimization_raw is not None
             else None
         )
+        execution_contract_raw = raw.get("execution_contract")
+        execution_contract = None
+        if execution_contract_raw is not None:
+            execution_contract = json.loads(
+                json.dumps(_mapping(execution_contract_raw, "execution_contract"), ensure_ascii=False)
+            )
         if optimization is not None:
             for parameter in parameters:
                 if parameter.minimum is None or parameter.maximum is None:
@@ -704,19 +824,20 @@ class ExperimentSpec:
                         f"optimized parameter {parameter.name} requires a non-zero range"
                     )
             reports_by_name = {report.name: report for report in reports}
-            for label, report_name in (
-                ("mass_flow_in_report", optimization.mass_flow_in_report),
-                ("mass_flow_out_report", optimization.mass_flow_out_report),
-            ):
-                report = reports_by_name.get(report_name)
-                if report is None:
-                    raise SpecError(
-                        f"optimization.{label} does not exist: {report_name}"
-                    )
-                if report.kind != "flux":
-                    raise SpecError(
-                        f"optimization.{label} must reference a flux report"
-                    )
+            if optimization.enable_legacy_mass_balance:
+                for label, report_name in (
+                    ("mass_flow_in_report", optimization.mass_flow_in_report),
+                    ("mass_flow_out_report", optimization.mass_flow_out_report),
+                ):
+                    report = reports_by_name.get(report_name)
+                    if report is None:
+                        raise SpecError(
+                            f"optimization.{label} does not exist: {report_name}"
+                        )
+                    if report.kind != "flux":
+                        raise SpecError(
+                            f"optimization.{label} must reference a flux report"
+                        )
             for check in optimization.conservation_checks:
                 for report_name in (*check.input_reports, *check.output_reports):
                     if report_name not in reports_by_name:
@@ -750,12 +871,18 @@ class ExperimentSpec:
             parameter_constraints=parameter_constraints,
             constraints=constraints,
             optimization=optimization,
+            execution_contract=execution_contract,
         )
 
     def to_dict(self) -> dict[str, Any]:
         # ``asdict`` preserves tuples, while specs cross JSON/MCP boundaries and
         # need a canonical JSON-native representation.
-        return json.loads(json.dumps(asdict(self), ensure_ascii=False))
+        raw = json.loads(json.dumps(asdict(self), ensure_ascii=False))
+        if raw['solver'].get('thermal_guard') is None:
+            raw['solver'].pop('thermal_guard', None)
+        if raw['solver'].get('iteration_chunk_size') is None:
+            raw['solver'].pop('iteration_chunk_size', None)
+        return raw
 
 
 def load_experiment_spec(path: str | os.PathLike[str]) -> ExperimentSpec:

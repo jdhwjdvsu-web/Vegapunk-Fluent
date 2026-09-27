@@ -112,16 +112,29 @@ def test_nonfinite_and_duplicate_api_values_rejected():
                          parameters=[dict(parameter_key="a", value=1)] * 2)
 
 
-def test_scanner_fixed_shape_is_read_only():
+def test_scanner_only_allows_restored_pressure_vector_probe_writes():
     import ast
     tree = ast.parse(build_introspection_code())
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
-            assert not any(isinstance(target, ast.Attribute) for target in node.targets)
+            for target in node.targets:
+                if isinstance(target, ast.Attribute):
+                    assert isinstance(target.value, ast.Name)
+                    assert target.value.id == '__vp_momentum'
+                    assert target.attr in {
+                        'direction_specification_method',
+                        'velocity_specification_method',
+                        'flow_direction',
+                    }
     code = build_introspection_code()
     assert "cold-inlet" not in code and "water-liquid" not in code
     assert "iterate(" not in code and "set_state(" not in code
     assert "is_read_only()" in code
+    assert "pseudo_time_courant_number.get_state()" in code
+    assert "['solver_readbacks']" in code
+    assert 'write_case' not in code and 'write_data' not in code
+    assert '__vp_momentum.get_state() != __vp_before' in code
+    assert '__vp_momentum.direction_specification_method = __vp_method' in code
 
 
 def test_cache_fingerprint_and_overrides(tmp_path, monkeypatch):

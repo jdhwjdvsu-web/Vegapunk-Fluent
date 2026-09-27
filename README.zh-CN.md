@@ -82,6 +82,15 @@ python launch_qa.py --question "What are recent advances in memory-augmented LLM
 python launch_qa.py -q "What are recent advances in memory-augmented LLMs?" -o answer.md
 ```
 
+### Fluent 实验规划 Agent V3
+
+`integrations/fluent` 提供基于 LangGraph 的有状态 Fluent 实验规划入口：自然语言
+任务会形成严格的 `SimulationTaskObject`，并在 Case 扫描目录内完成 DIRECT、
+MAPPED_PROXY、GEOMETRY_UNSUPPORTED 三分类、受限 Mapping DSL、安全校验和人工审批。
+执行阶段继续复用既有 Optuna、Fluent Runner、PyFluent-MCP、Gate 与 Job Service。
+几何代理结果当前只生成建议，不会自动调用 Workbench。完整说明见
+[Fluent Agent V3 架构与使用](docs/Fluent_Agent_V3_架构与使用.md)。
+
 ### 统一启动器
 
 `launch.py` 是两种模式的统一入口：

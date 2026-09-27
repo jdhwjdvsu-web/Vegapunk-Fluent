@@ -1,5 +1,21 @@
 # Vegapunk / PyFluent-MCP integration
 
+## Fluent Experiment Planning Agent V3 (2026-09-14)
+
+The Web workbench now uses LangGraph `StateGraph` as its planning orchestrator.
+Natural-language input is parsed into a strict `SimulationTaskObject`, classified
+by the configured `UnifiedModelRuntime` as `DIRECT`, `MAPPED_PROXY`, or
+`GEOMETRY_UNSUPPORTED`, validated against the Case-scoped Capability Registry, and
+paused for explicit human approval. SQLite checkpoints retain multi-turn planning
+state under the stable Web `task_id`; they do not replace Job Service idempotency.
+
+`MAPPED_PROXY` formulas are model-authored structured Mapping DSL, never Python.
+After validation and approval the DSL is frozen into the execution contract and is
+evaluated deterministically for each Optuna Trial before delegating to the existing
+Runner. Geometry results remain suggestion-only: the current release neither starts
+Workbench nor rebuilds/remeshes geometry. See
+[V3 architecture and usage](../../docs/Fluent_Agent_V3_架构与使用.md).
+
 ## Adaptive parameters milestone (2026-09-07)
 
 The Web workbench now discovers its parameter catalog from the selected Case via
@@ -10,8 +26,9 @@ adaptation remains the next milestone. See
 [implementation, usage and live evidence](../../docs/Fluent_Adaptive_实施与使用.md).
 
 The previous fixed catalog is retained only for legacy Python-call compatibility;
-an unscanned Web model exposes no parameters. The current assistant is a rule-based
-planner, not an LLM agent.
+an unscanned Web model exposes no parameters. Parameter discovery remains
+deterministic, while the V3 variable classification and mapping choices are made by
+the configured model and then checked by the server.
 
 This implementation uses the official
 [ansys/pyfluent-mcp](https://github.com/ansys/pyfluent-mcp) server.
@@ -148,6 +165,19 @@ bash integrations/fluent/wsl/run_optuna_demo.sh \
 
 The first command creates the SQLite study and closes Fluent. The second loads the
 same study and continues at the next trial; completed trials are not recomputed.
+This normal restart does not apply to a submitted Trial whose runtime state is
+uncertain. An uncertain Trial is recorded as `ORPHANED` and blocks the Campaign
+until manually diagnosed; it is never silently retried or told to Optuna as a
+normal failure.
+
+The synchronous MCP path uses separate configurable timeouts in `connection`:
+`tool_timeout_seconds` (default 60) for ordinary tools,
+`connect_timeout_seconds` (default 300) for session establishment, and
+`solve_timeout_seconds` (default 1800) for submitted `run_code`/Fluent solves.
+`client_timeout_seconds` remains the FastMCP client default. A timeout after
+submission produces a read-only `runtime_diagnosis/trial-*.json` and does not
+prove that Fluent failed. A future submit/poll/result protocol would provide
+stronger recovery than the current synchronous call.
 
 The audited output directory contains:
 

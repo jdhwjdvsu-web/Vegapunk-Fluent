@@ -25,12 +25,22 @@ class FluentJobController:
         spec: ExperimentSpec,
         output_dir: str | Path,
         client_factory=None,
+        *,
+        campaign_spec: ExperimentSpec | None = None,
     ):
         if spec.optimization is None:
             raise ValueError("Job Controller requires an optimization block")
         self.spec = spec
         self.output_dir = Path(output_dir)
-        self.manifest = load_or_create_campaign(self.output_dir, spec)
+        if campaign_spec is not None and (
+            campaign_spec.execution_contract != spec.execution_contract
+            or baseline_fingerprint(campaign_spec) != baseline_fingerprint(spec)
+        ):
+            raise ValueError("Semantic/native Job contracts or baseline identities differ")
+        self.manifest = load_or_create_campaign(self.output_dir, campaign_spec or spec)
+        # Semantic Optuna values and native vector values have different schemas.
+        # Keep separate ledgers but the same Campaign/Trial/Job identities.
+        self.ledger_root = self.output_dir / 'native_execution' if campaign_spec else self.output_dir
         self.client = FluentJobClient(spec, client_factory=client_factory)
 
     async def open_session(self) -> None:
@@ -47,7 +57,7 @@ class FluentJobController:
         del artifact_stem
         optimization = self.spec.optimization
         assert optimization is not None
-        ledger = TrialLedger(self.output_dir, self.manifest.campaign_id, name)
+        ledger = TrialLedger(self.ledger_root, self.manifest.campaign_id, name)
         document = ledger.create(parameters)
         if document["state"] in {
             TrialState.RESULT_READY.value,
@@ -151,7 +161,7 @@ class FluentJobController:
 
     def mark_gated(self, trial_name: str, gate: dict[str, Any]) -> None:
         ledger = TrialLedger(
-            self.output_dir, self.manifest.campaign_id, trial_name
+            self.ledger_root, self.manifest.campaign_id, trial_name
         )
         document = ledger.load()
         if document and document["state"] == TrialState.RESULT_READY.value:
@@ -159,7 +169,7 @@ class FluentJobController:
 
     def mark_told(self, trial_name: str) -> None:
         ledger = TrialLedger(
-            self.output_dir, self.manifest.campaign_id, trial_name
+            self.ledger_root, self.manifest.campaign_id, trial_name
         )
         document = ledger.load()
         if document and document["state"] == TrialState.GATED.value:

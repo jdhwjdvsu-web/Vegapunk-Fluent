@@ -17,6 +17,8 @@ from .codegen import (
     build_evaluate_point_code,
     extract_result_payload,
     normalize_computed_reports,
+    normalize_spec_reports,
+    parse_iteration_statistics,
     parse_last_residuals,
 )
 from .runner import FluentExperimentError
@@ -222,10 +224,7 @@ async def run_direct_temperature_case(
 
     stdout = str(execution.get("stdout", ""))
     payload = extract_result_payload(stdout)
-    reports = normalize_computed_reports(
-        payload.get("computed_reports"),
-        {report.name for report in spec.reports},
-    )
+    reports = normalize_spec_reports(payload.get("computed_reports"), spec)
     inlet = abs(float(reports[spec.optimization.mass_flow_in_report]["value"]))
     outlet = abs(float(reports[spec.optimization.mass_flow_out_report]["value"]))
     relative_error = abs(outlet - inlet) / max(
@@ -253,6 +252,7 @@ async def run_direct_temperature_case(
             for parameter in spec.parameters
         ],
         "iterations_requested": iterations,
+        **parse_iteration_statistics(stdout),
         "residuals": parse_last_residuals(stdout),
         "reports": reports,
         "objective_value": float(objective["value"]),

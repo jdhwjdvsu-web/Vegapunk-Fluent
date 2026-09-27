@@ -1,0 +1,17 @@
+{
+  "agent": {
+    "framework": "langgraph",
+    "checkpoint": "sqlite",
+    "timeout_seconds": 120,
+    "attempt_timeout_seconds": 480,
+    "network_retries": 1,
+    "reasoning_effort": "medium",
+    "max_classification_revisions": 3,
+    "max_mapping_revisions": 3
+  },
+  "geometry_handoff": {
+    "provider": "suggestion_only",
+    "workbench_mcp_endpoint": null,
+    "automatic_execution": false
+  }
+}

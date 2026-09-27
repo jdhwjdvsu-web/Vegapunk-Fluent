@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from .model_profile import UIParameter
 
-RULE_VERSION = "1.0"
+RULE_VERSION = "1.2"
 
 
 def scalar_value(value, rule):
@@ -55,6 +55,12 @@ RULES = (
     ParameterRule("thermal_conductivity", "fluid", "thermal_conductivity.value", "导热系数", "W/(m·K)", 1e-9, 1e6, category="材料物性", physics="energy", option_path="thermal_conductivity.option"),
     ParameterRule("solid_density", "solid", "density.value", "固体密度", "kg/m³", 1e-6, 1e6, category="材料物性", option_path="density.option"),
     ParameterRule("solid_conductivity", "solid", "thermal_conductivity.value", "固体导热系数", "W/(m·K)", 1e-9, 1e6, category="材料物性", physics="energy", option_path="thermal_conductivity.option"),
+    # Virtual scalar components are always executed as one atomic vector. 2D
+    # Fluent vectors receive a synthetic zero Z component in the planning API.
+    *(ParameterRule(f"flow_direction_{axis}", inlet_type,
+                    f"momentum.flow_direction_{axis}", f"入口方向 {axis.upper()}",
+                    "dimensionless", -1, 1, category="方向向量代理")
+      for inlet_type in ("pressure_inlet", "velocity_inlet") for axis in "xyz"),
 )
 
 
@@ -66,10 +72,20 @@ def collection_path(rule: ParameterRule) -> str:
 def resolve_parameters(signature: dict) -> list[UIParameter]:
     """Only accept observed active, scalar, constant nodes matching our rules."""
     candidates = []
-    rules = {rule.id: rule for rule in RULES}
+    rules = {(rule.id, rule.collection): rule for rule in RULES}
+    rules_by_id = {}
+    for rule in RULES:
+        rules_by_id.setdefault(rule.id, []).append(rule)
     seen = set()
     for observation in signature.get("observations", []):
-        rule = rules.get(observation.get("rule_id"))
+        rule_id = observation.get("rule_id")
+        observed_collection = observation.get("collection")
+        rule = rules.get((rule_id, observed_collection))
+        if rule is None and len(rules_by_id.get(rule_id, ())) == 1:
+            rule = rules_by_id[rule_id][0]
+        if rule is None and observed_collection is None and str(rule_id).startswith("flow_direction_"):
+            # Backward-compatible reading of 1.1 scanner fixtures/profiles.
+            rule = rules.get((rule_id, "pressure_inlet"))
         if rule is None or observation.get("editable") is not True:
             continue
         if rule.physics and signature.get("physics", {}).get(rule.physics) is not True:
@@ -80,7 +96,7 @@ def resolve_parameters(signature: dict) -> list[UIParameter]:
         name = observation.get("object_name")
         if not isinstance(name, str) or not name or len(name) > 256:
             continue
-        identity = (rule.id, name)
+        identity = (rule.collection, rule.id, name)
         if identity in seen:
             continue
         seen.add(identity)
@@ -113,7 +129,9 @@ def resolve_parameters(signature: dict) -> list[UIParameter]:
             property_path=rule.path, unit=rule.unit, hard_min=hard_min,
             hard_max=hard_max, recommended_min=low, recommended_max=high,
             default_value=value, step=0.0,
-            description="仅开放已读取的活动常数。硬边界是软件保护范围，不保证工程安全；建议范围须确认。",
+            description=("入口方向向量适配器分量；必须整组 XYZ 提交并归一化。扫描仅在独占会话临时切换模式并恢复，不保存案例。"
+                         if rule.id.startswith("flow_direction_") else
+                         "仅开放已读取的活动常数。硬边界是软件保护范围，不保证工程安全；建议范围须确认。"),
             scale_to_native=rule.scale, rule_id=rule.id,
         ))
     return candidates

@@ -29,6 +29,7 @@ Vegapunk 是一个面向长程自主科学发现的多智能体框架。系统�
 | 算法发现与论文复现 | 提供 `tasks/` 算法任务，并通过 `sci_tasks` 子模块支持 ResearchClawBench 论文复现任务 |
 | 记忆与深度研究 | 提供任务记忆、在线记忆、IdeaGraph、经验生成、MCP 工具和独立 QA/Deep Research 流程 |
 | 自动论文闭环 | Discovery 结束后自动执行候选选择、原料整理、提纲、写作、内容反思、PDF 编译和 VLM 版式审查 |
+| Fluent 实验规划 Agent V3 | 使用 LangGraph 持久规划自然语言 CFD 任务，服务端验证受限 Mapping DSL，并复用现有 Optuna、Runner、MCP、Gate 与审批链 |
 | 源码忠实移植 | 完整保留固定上游源码、Agent、提示词、同步 pipeline 和自主绘图，仅在模型、输入输出和宿主执行边界做适配 |
 
 ## 系统架构

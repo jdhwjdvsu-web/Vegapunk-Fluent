@@ -16,9 +16,13 @@ from .codegen import (
     build_evaluate_point_code,
     extract_result_payload,
     normalize_computed_reports,
+    normalize_spec_reports,
+    parse_iteration_statistics,
     parse_last_residuals,
 )
 from .spec import ConstraintSpec, ExperimentSpec
+from .history import append_jsonl, atomic_json
+from .session_identity import SessionObservation, continuity_error
 
 
 class FluentExperimentError(RuntimeError):
@@ -27,6 +31,14 @@ class FluentExperimentError(RuntimeError):
 
 class FluentStateUncertainError(FluentExperimentError):
     """Raised when a submitted solve may still be running and must not be retried."""
+
+    def __init__(self, message: str, *, diagnosis: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.diagnosis = diagnosis
+
+
+class DuplicateTrialError(FluentExperimentError):
+    """An existing trial identity must not be submitted to Fluent again."""
 
 
 _COMPARISONS: dict[str, Callable[[float, float], bool]] = {
@@ -119,6 +131,27 @@ class FluentExperimentRunner:
         self._client_context = None
         self._client = None
         self._connected_by_runner = False
+        self._state_uncertain = False
+        self._session_observation: SessionObservation | None = None
+
+    async def _check_session(self, stage: str, trial_id: str | None = None) -> None:
+        try:
+            status = await self._call(self._client, "session_status", {})
+            current = SessionObservation.from_status(status)
+            error = continuity_error(self._session_observation, current)
+            append_jsonl(self.output_dir / "session_audit.jsonl", {
+                **current.to_dict(), "stage": stage, "trial_id": trial_id,
+                "continuity": "BLOCKED" if error else "CONFIRMED" if current.fluent_session_id else "UNVERIFIED_IDENTITY",
+            })
+        except Exception as exc:
+            self._state_uncertain = True
+            raise FluentStateUncertainError("Read-only session check failed; no new Fluent submission is permitted",
+                                           diagnosis={"request_dispatched": False, "stage": stage}) from exc
+        if error:
+            self._state_uncertain = True
+            raise FluentStateUncertainError(error, diagnosis={**current.to_dict(),
+                                            "request_dispatched": False, "stage": stage})
+        self._session_observation = current
 
     def _new_client(self):
         if self.client_factory is not None:
@@ -138,12 +171,12 @@ class FluentExperimentRunner:
         )
 
     async def _call(
-        self, client, name: str, arguments: dict[str, Any]
+        self, client, name: str, arguments: dict[str, Any], *, timeout_seconds: int | None = None,
     ) -> dict[str, Any]:
         result = await client.call_tool(
             name,
             arguments,
-            timeout=self.spec.connection.client_timeout_seconds,
+            timeout=timeout_seconds or self.spec.connection.tool_timeout_seconds,
             raise_on_error=False,
         )
         error = _tool_error(result)
@@ -151,17 +184,21 @@ class FluentExperimentRunner:
             raise FluentExperimentError(f"{name} failed: {error}")
         return _structured(result)
 
-    async def _validated_run_code(self, client, code: str) -> dict[str, Any]:
+    async def _validated_run_code(
+        self, client, code: str, *, run_timeout_seconds: int | None = None,
+    ) -> dict[str, Any]:
         validation = await self._call(client, "validate_code", {"code": code})
         if validation.get("status") != "ok":
             raise FluentExperimentError(
                 f"PyFluent-MCP rejected generated code: {validation.get('message')}"
             )
         try:
-            execution = await self._call(client, "run_code", {"code": code})
-        except FluentExperimentError:
-            raise
+            execution = await self._call(
+                client, "run_code", {"code": code},
+                timeout_seconds=run_timeout_seconds or self.spec.connection.solve_timeout_seconds,
+            )
         except Exception as exc:
+            self._state_uncertain = True
             raise FluentStateUncertainError(
                 "the MCP connection failed after Fluent code was submitted; "
                 "the solver state is uncertain and this trial must not be retried"
@@ -182,6 +219,8 @@ class FluentExperimentRunner:
         try:
             self._client = await self._client_context.__aenter__()
             status = await self._call(self._client, "session_status", {})
+            if not isinstance(status.get("connected"), bool):
+                raise FluentExperimentError("session_status did not confirm connection state; refusing connect")
             if status.get("connected"):
                 if not self.spec.connection.reuse_existing_session:
                     raise FluentExperimentError(
@@ -193,12 +232,14 @@ class FluentExperimentRunner:
                     self._client,
                     "connect",
                     {"connect_kwargs": self.spec.connection.connect_kwargs},
+                    timeout_seconds=self.spec.connection.connect_timeout_seconds,
                 )
                 if connect_result.get("status") != "ok":
                     raise FluentExperimentError(
                         f"Fluent connection failed: {connect_result.get('message')}"
                     )
                 self._connected_by_runner = True
+            await self._check_session("open_session")
         except Exception:
             if self._client_context is not None:
                 await self._client_context.__aexit__(None, None, None)
@@ -236,6 +277,9 @@ class FluentExperimentRunner:
         from .spec import DesignPointSpec
 
         values = self._validate_parameters(parameters)
+        if self.spec.solver.thermal_guard:
+            from .thermal_guard import verify_thermal_data
+            verify_thermal_data(self.spec.solver.thermal_guard)
         point = DesignPointSpec(name=name, values=values)
         code = build_evaluate_point_code(self.spec, point)
         stem = re_safe_name(artifact_stem or name, fallback="trial")
@@ -243,18 +287,36 @@ class FluentExperimentRunner:
         log_dir = self.output_dir / "solver_stdout"
         code_dir.mkdir(parents=True, exist_ok=True)
         log_dir.mkdir(parents=True, exist_ok=True)
+        if ((code_dir / f"{stem}.py").exists()
+                or (self.output_dir / "trial_results" / f"{stem}.json").exists()):
+            raise DuplicateTrialError(
+                f"trial identity {stem} already has execution artifacts; refusing duplicate submission"
+            )
+        if self._state_uncertain:
+            raise FluentStateUncertainError("Runner is blocked by an unresolved runtime state")
+        await self._check_session("before_trial", stem)
         (code_dir / f"{stem}.py").write_text(code, encoding="utf-8")
 
         started = time.perf_counter()
-        execution = await self._validated_run_code(self._client, code)
+        try:
+            execution = await self._validated_run_code(self._client, code)
+        except FluentStateUncertainError as exc:
+            from .runtime_reliability import diagnose_runtime, save_diagnosis
+            try:
+                diagnosis = await diagnose_runtime(
+                    self.output_dir, stem, self.spec.connection.endpoint,
+                    parameters=values, request_dispatched=True,
+                )
+                save_diagnosis(self.output_dir, diagnosis)
+                exc.diagnosis = diagnosis.to_dict()
+            except Exception as diagnosis_exc:  # Preserve the submitted-solve error.
+                exc.diagnosis = {"diagnosis_error": str(diagnosis_exc)}
+            raise
         elapsed = time.perf_counter() - started
         stdout = str(execution.get("stdout", ""))
         (log_dir / f"{stem}.log").write_text(stdout, encoding="utf-8")
         payload = extract_result_payload(stdout)
-        reports = normalize_computed_reports(
-            payload.get("computed_reports"),
-            {report.name for report in self.spec.reports},
-        )
+        reports = normalize_spec_reports(payload.get("computed_reports"), self.spec)
         monitor_history: dict[str, list[float]] = {}
         if self.spec.optimization is not None:
             monitor_names = {
@@ -273,6 +335,7 @@ class FluentExperimentRunner:
         objective_report = reports[self.spec.objective.report]
         constraints = _evaluate_constraints(reports, self.spec.constraints)
         residuals = parse_last_residuals(stdout)
+        iteration_statistics = parse_iteration_statistics(stdout)
         convergence = _evaluate_residuals(
             residuals, self.spec.solver.residual_thresholds
         )
@@ -288,11 +351,17 @@ class FluentExperimentRunner:
             "constraints": constraints,
             "monitor_history": monitor_history,
             "iterations_requested": self.spec.solver.iterations,
+            **iteration_statistics,
             "elapsed_seconds": elapsed,
             "baseline_reloaded": True,
+            "fluent_session_id": self._session_observation.fluent_session_id if self._session_observation else None,
+            "session_identity_status": self._session_observation.identity_status if self._session_observation else "UNAVAILABLE",
             "error": None,
         }
-        if self.spec.optimization is not None:
+        if (
+            self.spec.optimization is not None
+            and self.spec.optimization.enable_legacy_mass_balance
+        ):
             optimization = self.spec.optimization
             inlet = reports[optimization.mass_flow_in_report]
             outlet = reports[optimization.mass_flow_out_report]
@@ -303,6 +372,10 @@ class FluentExperimentRunner:
                     "mass_flow_unit": inlet.get("unit") or outlet.get("unit"),
                 }
             )
+        if self.spec.solver.thermal_guard:
+            from .thermal_guard import evaluate_thermal_guard
+            result['thermal_guard'] = evaluate_thermal_guard(self.spec.solver.thermal_guard, payload.get('thermal_history_raw', []), stdout, self.spec.solver.residual_thresholds)
+            result['thermal_history_raw'] = payload.get('thermal_history_raw', [])
         return result
 
     async def close_session(self) -> str | None:
@@ -310,11 +383,29 @@ class FluentExperimentRunner:
 
         warning = None
         try:
-            if (
+            if self._state_uncertain:
+                warning = "solver state uncertain; no automatic Fluent exit or disconnect was sent"
+            elif (
                 self._client is not None
                 and self._connected_by_runner
                 and self.spec.connection.disconnect_on_exit
             ):
+                try:
+                    await self._check_session("before_cleanup")
+                except FluentStateUncertainError as exc:
+                    return "solver session uncertain; no exit or disconnect was sent: " + str(exc)
+                try:
+                    if self.spec.solver.thermal_guard:
+                        # This serial CHT workflow owns the session. Wait for its
+                        # local processes to exit before the next licensed Job.
+                        await self._validated_run_code(
+                            self._client, 'solver.exit(timeout=15, wait=15)\n',
+                            run_timeout_seconds=self.spec.connection.tool_timeout_seconds,
+                        )
+                except Exception as exc:
+                    warning = 'explicit owned-session exit: ' + str(exc)
+                    if self._state_uncertain:
+                        return warning + '; no disconnect was sent'
                 try:
                     await self._call(self._client, "disconnect", {})
                 except Exception as exc:  # noqa: BLE001 - preserve cleanup warning
@@ -325,6 +416,8 @@ class FluentExperimentRunner:
             self._client_context = None
             self._client = None
             self._connected_by_runner = False
+            self._state_uncertain = False
+            self._session_observation = None
         return warning
 
     async def run(self) -> dict[str, Any]:
@@ -441,9 +534,7 @@ class FluentExperimentRunner:
             ),
         }
         document["completed_at"] = datetime.now(timezone.utc).isoformat()
-        (self.output_dir / "fluent_result.json").write_text(
-            json.dumps(document, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        atomic_json(self.output_dir / "fluent_result.json", document)
         final_info = {
             self.spec.task_name: {
                 "means": means,
@@ -452,9 +543,7 @@ class FluentExperimentRunner:
                 "artifact": "fluent_result.json",
             }
         }
-        (self.output_dir / "final_info.json").write_text(
-            json.dumps(final_info, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        atomic_json(self.output_dir / "final_info.json", final_info)
 
 
 def re_safe_name(value: str, fallback: str) -> str:

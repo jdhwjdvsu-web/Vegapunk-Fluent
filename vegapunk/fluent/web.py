@@ -7,10 +7,10 @@ import asyncio
 import ipaddress
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Mapping
 from urllib.parse import urlparse
 
 import uvicorn
@@ -21,8 +21,29 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .direct_run import run_direct_temperature_case
+from .agent_graph import FluentAgentGraph
+from .planning_attempts import PlanningAttemptStore
+from .capability_registry import CapabilityRegistry
+from .experiment_orchestrator import (
+    ResolvedExperiment,
+    compile_resolved_experiment,
+    run_resolved_optimization,
+)
 from .optimizer import run_optimization
+from .planning import (
+    approve_plan,
+    approve_resolved_task,
+    assert_approval,
+    assert_resolved_approval,
+    compile_experiment_spec,
+    default_plan,
+    normalize_plan,
+    save_plan,
+)
+from .simulation_agent import SimulationAgent
 from .spec import ExperimentSpec, SpecError
+from .verification import run_independent_verification, verification_is_trusted
+from .execution_approval import ExecutionApproval, seal_execution, require_execution_approval
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SPEC_PATH = PROJECT_ROOT / "config/fluent/mixing_elbow.optuna-demo.json"
@@ -32,6 +53,7 @@ DEFAULT_UI_DIR = PROJECT_ROOT / "integrations/fluent/ui"
 
 from .adaptive import AdaptiveModels
 from .model_profile import UIParameter, MAX_PARAMETERS
+from .profile_store import case_sha256
 from .legacy_catalog import _parameter  # Compatibility for pre-discovery Python callers only.
 
 
@@ -111,20 +133,80 @@ class SaveRangesRequest(BaseModel):
         return self
 
 
+class ObjectiveRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    metric_key: str = Field(min_length=1, max_length=128)
+    direction: str = Field(pattern=r"^(minimize|maximize)$")
+
+
+class MetricConstraintRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, allow_inf_nan=False, extra="forbid")
+    metric_key: str = Field(min_length=1, max_length=128)
+    operator: str = Field(pattern=r"^(?:<|<=|>|>=|==)$")
+    value: float
+
+
+class ChecksRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
+    finite_outputs: bool = True
+    mass_balance: bool = False
+    mass_balance_relative_tolerance: float = Field(default=0.001, gt=0, lt=1)
+    residual_thresholds: dict[str, float] = Field(default_factory=dict)
+
+
+class BudgetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target_trials: int = Field(default=6, ge=1, le=1000)
+    iterations: int = Field(default=100, ge=1, le=1_000_000)
+
+
+class PlanRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, allow_inf_nan=False, extra="forbid")
+    schema_version: int = Field(default=1, ge=1, le=1)
+    research_question: str = Field(default="", max_length=4000)
+    parameters: list[ParameterRangeRequest] = Field(min_length=1, max_length=MAX_PARAMETERS)
+    objective: ObjectiveRequest
+    constraints: list[MetricConstraintRequest] = Field(default_factory=list, max_length=20)
+    checks: ChecksRequest = Field(default_factory=ChecksRequest)
+    budget: BudgetRequest = Field(default_factory=BudgetRequest)
+
+
+class ApprovePlanRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    approved_by: str = Field(default="local-user", min_length=1, max_length=120)
+    plan_revision: int | None = Field(default=None, ge=1)
+    planning_attempt_id: str | None = Field(default=None, max_length=120)
+
+
+class AgentMessageRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    message: str = Field(min_length=1, max_length=8000)
+    input_category: Literal[
+        "initial_request",
+        "physical_clarification",
+        "plan_revision",
+        "technical_repair",
+        "retry",
+        "user_message",
+    ] = "user_message"
+    reasoning: Literal["low", "medium", "high"] | None = None
+
+
 class RunRequest(BaseModel):
     """Validated multi-variable subset of the Fluent experiment contract."""
 
     model_config = ConfigDict(str_strip_whitespace=True, allow_inf_nan=False, extra="forbid")
 
     case_file: str = Field(min_length=1, max_length=1024)
-    target_trials: int = Field(ge=1, le=100)
-    parameters: list[ParameterRangeRequest] = Field(min_length=1, max_length=MAX_PARAMETERS)
+    target_trials: int = Field(ge=1, le=1000)
+    parameters: list[ParameterRangeRequest] | None = Field(default=None, min_length=1, max_length=MAX_PARAMETERS)
     iterations: int = Field(ge=1, le=1_000_000)
     endpoint: str = Field(min_length=1, max_length=2048)
+    start_request_id: str | None = Field(default=None, min_length=8, max_length=160)
 
     @model_validator(mode="after")
     def validate_distinct_parameters(self) -> RunRequest:
-        keys = [item.parameter_key for item in self.parameters]
+        keys = [item.parameter_key for item in (self.parameters or [])]
         if len(set(keys)) != len(keys):
             raise ValueError("优化变量不能相同")
         return self
@@ -183,6 +265,7 @@ def _default_form(raw: dict[str, Any]) -> dict[str, Any]:
     solver = raw.get("solver") or {}
     return {
         "case_file": case_file,
+        "dimension": int(connect_kwargs.get("dimension", 3)),
         "target_trials": int(optimization.get("target_trials", 6)),
         "parameters": [],
         "direct_parameters": [],
@@ -335,6 +418,8 @@ class WebRuntime:
     task_created_at: str = field(default_factory=_utc_now)
     archived_tasks: list[dict[str, Any]] = field(default_factory=list)
     conversation_revision: int = 0
+    planning_mode: str | None = None
+    start_requests: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.workspace_root = self.output_dir
@@ -355,6 +440,10 @@ class WebRuntime:
         self.task_id = str(current.get("id") or self.task_id)
         self.task_label = str(current.get("label") or self.task_label)
         self.task_created_at = str(current.get("created_at") or self.task_created_at)
+        mode = current.get("planning_mode")
+        self.planning_mode = mode if mode in {"agent_v3", "manual"} else None
+        saved_requests = current.get("start_requests")
+        self.start_requests = dict(saved_requests) if isinstance(saved_requests, dict) else {}
 
     @property
     def _task_state_path(self) -> Path:
@@ -366,6 +455,8 @@ class WebRuntime:
             "label": self.task_label,
             "created_at": self.task_created_at,
             "output_dir": str(self.output_dir),
+            "planning_mode": self.planning_mode,
+            "start_requests": self.start_requests,
         }
 
     def _persist_task_state(self) -> None:
@@ -414,13 +505,24 @@ class WebRuntime:
         self.direct_finished_at = None
         self.direct_error = None
         self.direct_result = None
+        self.planning_mode = None
+        self.start_requests = {}
         self.conversation_revision += 1
         self._persist_task_state()
         return self._task_record()
 
     def clear_conversation(self) -> int:
         self.conversation_revision += 1
+        self.planning_mode = None
+        self.start_requests = {}
+        self._persist_task_state()
         return self.conversation_revision
+
+    def set_planning_mode(self, mode: str) -> None:
+        if mode not in {"agent_v3", "manual"}:
+            raise ValueError(f"不支持的规划模式：{mode}")
+        self.planning_mode = mode
+        self._persist_task_state()
 
     def can_control(self, request: Request) -> bool:
         client_host = request.client.host if request.client is not None else None
@@ -512,9 +614,76 @@ class WebRuntime:
         self.finished_at = None
         self.error = None
         self.active_target = target
+        async def optimize_and_verify() -> dict[str, Any]:
+            summary = await run_optimization(
+                spec, self.output_dir, target_trials=target
+            )
+            if (
+                summary.get("best_params")
+                and isinstance(summary.get("best_value"), (int, float))
+            ):
+                summary["verification"] = await run_independent_verification(
+                    spec,
+                    self.output_dir,
+                    summary["best_params"],
+                    float(summary["best_value"]),
+                )
+                summary["best_status"] = "BEST_VERIFIED" if verification_is_trusted(
+                    summary["verification"], summary["best_params"], summary["best_value"]) else "BEST_OBSERVED"
+                from .history import atomic_json
+                atomic_json(self.output_dir / "demo_summary.json", summary)
+            return summary
+
         self.task = asyncio.create_task(
-            run_optimization(spec, self.output_dir, target_trials=target),
-            name="fluent-optimization",
+            optimize_and_verify(), name="fluent-optimization-and-verification"
+        )
+
+    async def start_resolved(
+        self,
+        experiment: ResolvedExperiment,
+        registry: CapabilityRegistry,
+        agent_graph: FluentAgentGraph,
+    ) -> None:
+        self.refresh_task()
+        self.refresh_direct_task()
+        if self.is_busy():
+            raise RuntimeError("已有 Fluent 计算正在运行")
+        require_execution_approval(experiment, registry)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.job_status = "running"
+        self.started_at = _utc_now()
+        self.finished_at = None
+        self.error = None
+        self.active_target = experiment.resolved_task.task.termination.max_trials
+
+        async def optimize_record_and_interpret() -> dict[str, Any]:
+            summary = await run_resolved_optimization(
+                experiment, self.output_dir, registry
+            )
+            from .history import atomic_json
+
+            atomic_json(self.output_dir / "demo_summary.json", summary)
+            await agent_graph.record_experiment_result(
+                self.task_id,
+                {
+                    "campaign_id": summary.get("campaign_id"),
+                    "active_trial_id": (
+                        f"trial-{int(summary['best_trial_number']):04d}"
+                        if summary.get("best_trial_number") is not None
+                        else None
+                    ),
+                    "solved_trials": summary.get("solved_trials", 0),
+                    "completed_trials": summary.get("completed_trials", 0),
+                    "feasible_trials": summary.get("feasible_trials", 0),
+                    "failed_trials": summary.get("failed_trials", 0),
+                    "best_result": summary.get("best_result"),
+                    "termination_reason": summary.get("termination_reason"),
+                },
+            )
+            return summary
+
+        self.task = asyncio.create_task(
+            optimize_record_and_interpret(), name="fluent-agent-v3-optimization"
         )
 
     async def start_direct(
@@ -576,6 +745,8 @@ def create_app(
     output_dir: str | Path = DEFAULT_OUTPUT_DIR,
     ui_dir: str | Path = DEFAULT_UI_DIR,
     allow_remote_control: bool = False,
+    agent_runtime: Any | None = None,
+    agent_model_id: str | None = None,
 ) -> FastAPI:
     spec_file = Path(spec_path).resolve()
     output = Path(output_dir).resolve()
@@ -596,10 +767,246 @@ def create_app(
     models.restore_selection(runtime.output_dir)
     models.apply_defaults(defaults)
     control_lock = asyncio.Lock()
+    agent_lock = asyncio.Lock()
+    agent_config = (_read_json(PROJECT_ROOT / "config/fluent/agent_v3.json") or {}).get("agent", {})
+    attempt_store = PlanningAttemptStore(
+        output / "model_library" / "planning_attempts",
+        timeout_seconds=float(agent_config.get("attempt_timeout_seconds", 480)),
+    )
+    agent = (
+        SimulationAgent(agent_runtime, model_id=agent_model_id)
+        if agent_runtime is not None
+        else SimulationAgent.from_environment()
+    )
+
+    def current_identity(expected: dict[str, Any]) -> bool:
+        profile = models.profile or {}
+        attempt_id = expected.get("planning_attempt_id")
+        return (
+            expected.get("task_id") == runtime.task_id
+            and expected.get("conversation_revision") == runtime.conversation_revision
+            and expected.get("model_id") == profile.get("model_id")
+            and expected.get("case_sha256") == profile.get("case_sha256")
+            and expected.get("model_signature_sha256") == profile.get("signature_sha256")
+            and (attempt_id is None or attempt_store.is_current(runtime.task_id, str(attempt_id)))
+        )
+
+    agent_graph = FluentAgentGraph(
+        agent.runtime,
+        model_id=agent.model_id,
+        database_path=output / "model_library" / "agent_checkpoints.sqlite3",
+        output_dir_provider=lambda: runtime.output_dir,
+        identity_checker=current_identity,
+        timeout_seconds=float(agent_config.get("timeout_seconds", 120)),
+        max_classification_revisions=int(agent_config.get("max_classification_revisions", 3)),
+        max_mapping_revisions=int(agent_config.get("max_mapping_revisions", 3)),
+        network_retries=int(agent_config.get("network_retries", 1)),
+        unavailable_reason=agent.reason,
+    )
+    if models.profile:
+        agent_graph.bind_registry(
+            CapabilityRegistry(models.profile, models.catalog(), models.metrics())
+        )
+
+    def active_attempt() -> dict[str, Any] | None:
+        return attempt_store.active_for_task(runtime.task_id)
+
+    def planning_busy() -> bool:
+        return agent_lock.locked() or active_attempt() is not None
+
+    def plan_path() -> Path:
+        return runtime.output_dir / "experiment_plan.json"
+
+    def approval_path() -> Path:
+        return runtime.output_dir / "plan_approval.json"
+
+    def v3_approval_context(graph_state: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "task_id": runtime.task_id,
+            "conversation_revision": runtime.conversation_revision,
+            "plan_revision": int(graph_state.get("plan_revision", 0)),
+            "planning_attempt_id": graph_state.get("planning_attempt_id"),
+        }
+
+    def current_plan() -> dict[str, Any] | None:
+        value = _read_json(plan_path())
+        if value is not None or not models.profile:
+            return value
+        value = default_plan(
+            models.profile,
+            models.catalog(),
+            models.metrics(),
+            target_trials=int(defaults.get("target_trials", 6)),
+            iterations=int(defaults.get("iterations", 100)),
+        )
+        if value is not None:
+            save_plan(plan_path(), value)
+        return value
+
+    def approval_state(
+        plan: dict[str, Any] | None,
+        graph_state: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        approval = _read_json(approval_path())
+        if not models.profile or not approval:
+            return {"status": "required", "record": None}
+        try:
+            is_v3_approval = bool(approval.get("payload", {}).get("agent_v3"))
+            if runtime.planning_mode == "agent_v3" and not is_v3_approval:
+                raise PermissionError("当前任务需要 V3 审批")
+            if runtime.planning_mode == "manual" and is_v3_approval:
+                raise PermissionError("当前任务需要手动方案审批")
+            if is_v3_approval:
+                if not approval.get("execution_approval"):
+                    raise PermissionError("旧 V3 审批缺少完整执行契约")
+                resolved = (graph_state or {}).get("resolved_task")
+                if not resolved:
+                    raise PermissionError("V3 Graph State 不存在")
+                assert_resolved_approval(
+                    models.profile,
+                    resolved,
+                    approval,
+                    v3_approval_context(graph_state or {}),
+                )
+            else:
+                if not plan:
+                    raise PermissionError("实验方案不存在")
+                assert_approval(models.profile, plan, approval)
+        except (PermissionError, ValueError, KeyError):
+            return {"status": "stale", "record": approval}
+        return {"status": "approved", "record": approval}
+
+    async def execute_planning_attempt(attempt_id: str) -> None:
+        record = attempt_store.get(attempt_id)
+        if record is None:
+            return
+        attempt_store.update(attempt_id, status="running", started_at=_utc_now())
+        identity = dict(record["identity"])
+        try:
+            reply_state = await asyncio.wait_for(
+                agent_graph.message(
+                    str(record["message"]),
+                    task_id=str(record["task_id"]),
+                    conversation_revision=int(identity["conversation_revision"]),
+                    model_id=str(identity["model_id"]),
+                    case_sha256=str(identity["case_sha256"]),
+                    model_signature_sha256=str(identity["model_signature_sha256"]),
+                    planning_attempt_id=attempt_id,
+                    input_category=str(record["input_category"]),
+                    effective_reasoning=str(record["effective_reasoning"]),
+                ),
+                timeout=float(record["timeout_seconds"]),
+            )
+        except asyncio.TimeoutError:
+            await agent_graph.set_terminal_state(
+                str(record["task_id"]),
+                status="timed_out",
+                message="本次完整规划超过总时间预算，已终止。可以显式重试。",
+                error="planning_attempt_deadline_exceeded",
+            )
+            attempt_store.update(
+                attempt_id,
+                status="timed_out",
+                graph_status="timed_out",
+                current_node=None,
+                finished_at=_utc_now(),
+                error="planning_attempt_deadline_exceeded",
+            )
+            return
+        except asyncio.CancelledError:
+            if (attempt_store.get(attempt_id) or {}).get("status") not in {"cancelled", "interrupted"}:
+                attempt_store.update(
+                    attempt_id,
+                    status="cancelled",
+                    graph_status="cancelled",
+                    current_node=None,
+                    finished_at=_utc_now(),
+                    error="local_cancellation",
+                )
+            return
+        except Exception as exc:
+            attempt_store.update(
+                attempt_id,
+                status="failed",
+                graph_status="failed",
+                current_node=None,
+                finished_at=_utc_now(),
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            return
+
+        graph_status = str(reply_state.get("status") or "completed")
+        attempt_store.update(
+            attempt_id,
+            status=graph_status,
+            graph_status=graph_status,
+            current_node=reply_state.get("current_node"),
+            finished_at=_utc_now(),
+            response={
+                "message": reply_state.get("agent_message", ""),
+                "questions": reply_state.get("clarification_questions", []),
+                "has_task_object": bool(reply_state.get("task_object")),
+                "has_resolved_task": bool(reply_state.get("resolved_task")),
+                "validation_errors": reply_state.get("validation_errors", []),
+            },
+        )
+
+    async def submit_planning_attempt(form: AgentMessageRequest) -> dict[str, Any]:
+        if not models.profile:
+            raise RuntimeError("请先分析 Fluent 模型")
+        reasoning = form.reasoning or str(agent_config.get("reasoning_effort", "medium"))
+        identity = {
+            "task_id": runtime.task_id,
+            "conversation_revision": runtime.conversation_revision,
+            "model_id": models.profile["model_id"],
+            "case_sha256": models.profile["case_sha256"],
+            "model_signature_sha256": models.profile["signature_sha256"],
+        }
+        record = attempt_store.create(
+            task_id=runtime.task_id,
+            message=form.message,
+            input_category=form.input_category,
+            identity=identity,
+            model_id=agent.model_id,
+            effective_reasoning=reasoning,
+        )
+        runtime.set_planning_mode("agent_v3")
+        task = asyncio.create_task(
+            execute_planning_attempt(str(record["attempt_id"])),
+            name=f"fluent-planning-{record['attempt_id']}",
+        )
+        attempt_store.attach(str(record["attempt_id"]), task)
+        return record
 
     app = FastAPI(title="Vegapunk Fluent Lab", version="0.1.0")
     app.state.fluent_runtime = runtime
     app.state.adaptive_models = models
+    app.state.simulation_agent = agent
+    app.state.fluent_agent_graph = agent_graph
+    app.state.planning_attempts = attempt_store
+
+    @app.on_event("startup")
+    async def start_agent_checkpoint() -> None:
+        await agent_graph.start()
+
+    @app.on_event("shutdown")
+    async def close_agent_checkpoint() -> None:
+        pending = []
+        for attempt_id, task in list(attempt_store.tasks.items()):
+            if not task.done():
+                attempt_store.update(
+                    attempt_id,
+                    status="interrupted",
+                    graph_status="interrupted",
+                    current_node=None,
+                    finished_at=_utc_now(),
+                    error="服务关闭导致规划中断",
+                )
+                task.cancel()
+                pending.append(task)
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        await agent_graph.close()
 
     @app.middleware("http")
     async def same_origin_mutations(request: Request, call_next):
@@ -622,7 +1029,7 @@ def create_app(
     async def analyze_model(request: Request, form: AnalyzeModelRequest) -> dict:
         if not runtime.can_control(request):
             raise HTTPException(status_code=403, detail="远程页面为只读")
-        if control_lock.locked() or runtime.is_busy():
+        if control_lock.locked() or planning_busy() or runtime.is_busy():
             raise HTTPException(status_code=409, detail="已有模型扫描或计算正在运行")
         try:
             async with control_lock:
@@ -632,6 +1039,9 @@ def create_app(
                     runtime.new_task()
                 models.persist_selection(runtime.output_dir)
                 models.apply_defaults(defaults)
+                agent_graph.bind_registry(
+                    CapabilityRegistry(profile, models.catalog(), models.metrics())
+                )
             return {"profile": profile, "cached": cached}
         except (RuntimeError, ValueError, OSError) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -645,6 +1055,12 @@ def create_app(
         try:
             models.save_ranges(form.parameters, runtime.output_dir)
             models.apply_defaults(defaults)
+            plan = current_plan()
+            if plan is not None:
+                updated = dict(plan)
+                updated["parameters"] = [item.model_dump() for item in form.parameters]
+                updated = normalize_plan(updated, models.catalog(), models.metrics())
+                save_plan(plan_path(), updated)
         except (ValueError, OSError) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"saved": True}
@@ -664,6 +1080,14 @@ def create_app(
             if summary
             else defaults["target_trials"]
         )
+        plan = current_plan()
+        graph_state = (
+            await agent_graph.get_state(runtime.task_id) if models.profile else None
+        )
+        attempt = attempt_store.latest_for_task(runtime.task_id)
+        if attempt and attempt.get("status") in {"queued", "running", "cancelling"} and graph_state:
+            attempt["current_node"] = graph_state.get("current_node")
+            attempt["graph_status"] = graph_state.get("status")
         return {
             "server": {
                 "can_control": runtime.can_control(request),
@@ -671,6 +1095,7 @@ def create_app(
                 if runtime.can_control(request)
                 else "远程只读",
             },
+            "runtime_reconciliation": _read_json(runtime.output_dir / "runtime_reconciliation.json"),
             "job": {
                 "status": runtime.job_status,
                 "started_at": runtime.started_at,
@@ -692,11 +1117,200 @@ def create_app(
                 "archives": runtime.archived_tasks[-20:],
             },
             "parameters": [item.public_dict() for item in models.catalog().values()],
+            "metrics": [item.public_dict() for item in models.metrics().values()],
             "model": models.state(),
+            "plan": plan,
+            "approval": approval_state(plan, graph_state),
+            "agent": {**agent_graph.state_info(), "state": graph_state, "attempt": attempt},
             "mcp": {"endpoint": endpoint, **mcp},
             "defaults": defaults,
             "summary": summary,
             "trials": trials,
+        }
+
+    @app.post("/api/plans")
+    async def save_experiment_plan(request: Request, form: PlanRequest) -> dict[str, Any]:
+        if not runtime.can_control(request):
+            raise HTTPException(status_code=403, detail="远程页面为只读")
+        if runtime.is_busy() or models.busy:
+            raise HTTPException(status_code=409, detail="请等待当前操作完成")
+        if planning_busy():
+            raise HTTPException(status_code=409, detail="Agent 正在规划，不能同时保存手动方案")
+        if not models.profile:
+            raise HTTPException(status_code=409, detail="请先分析 Fluent 模型")
+        if runtime.planning_mode == "agent_v3":
+            raise HTTPException(status_code=409, detail="当前任务已进入 Agent V3 模式；请新建任务后再使用手动方案")
+        try:
+            if runtime.planning_mode is None:
+                existing_graph = await agent_graph.get_state(runtime.task_id)
+                if existing_graph and (
+                    existing_graph.get("task_object")
+                    or existing_graph.get("resolved_task")
+                    or existing_graph.get("status") not in {None, "idle"}
+                ):
+                    raise ValueError("这是缺少 planning_mode 的历史任务；请新建任务后显式选择规划方式")
+            runtime.set_planning_mode("manual")
+            plan = normalize_plan(form.model_dump(), models.catalog(), models.metrics())
+            save_plan(plan_path(), plan)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        graph_state = await agent_graph.get_state(runtime.task_id)
+        return {"saved": True, "plan": plan, "approval": approval_state(plan, graph_state)}
+
+    @app.post("/api/plans/approve")
+    async def approve_experiment_plan(
+        request: Request, form: ApprovePlanRequest
+    ) -> dict[str, Any]:
+        if not runtime.can_control(request):
+            raise HTTPException(status_code=403, detail="远程页面为只读")
+        if runtime.is_busy() or models.busy:
+            raise HTTPException(status_code=409, detail="请等待当前操作完成")
+        if planning_busy():
+            raise HTTPException(status_code=409, detail="Agent 正在规划，不能审批旧状态")
+        if not models.profile:
+            raise HTTPException(status_code=409, detail="没有可审批的实验方案")
+        try:
+            graph_state = await agent_graph.get_state(runtime.task_id)
+            if runtime.planning_mode == "agent_v3":
+                resolved = (graph_state or {}).get("resolved_task")
+                if (
+                    not graph_state
+                    or graph_state.get("status") != "awaiting_approval"
+                    or not resolved
+                    or not resolved.get("executable")
+                    or graph_state.get("validation_errors")
+                    or any(
+                        issue.get("status") == "open" and issue.get("severity") == "blocking"
+                        for issue in graph_state.get("active_issues", [])
+                    )
+                ):
+                    raise ValueError("V3 规划尚未形成可执行且已验证的待审批任务")
+                if (
+                    form.plan_revision != int((graph_state or {}).get("plan_revision", 0))
+                    or form.planning_attempt_id != (graph_state or {}).get("planning_attempt_id")
+                ):
+                    raise ValueError("审批请求不是当前 V3 revision/attempt，请刷新后重试")
+                record = approve_resolved_task(
+                    models.profile,
+                    resolved,
+                    form.approved_by,
+                    v3_approval_context(graph_state),
+                )
+                registry = CapabilityRegistry(models.profile, models.catalog(), models.metrics())
+                experiment = compile_resolved_experiment(
+                    raw_spec, models.profile, resolved, registry, models.profile["endpoint"],
+                )
+                record["execution_approval"] = seal_execution(
+                    experiment, registry, approval_id=record["fingerprint"],
+                    approved_by=form.approved_by, mode="V3_APPROVED",
+                ).model_dump(mode="json")
+            elif runtime.planning_mode == "manual":
+                plan = current_plan()
+                if plan is None:
+                    raise ValueError("没有可审批的手动实验方案")
+                record = approve_plan(models.profile, plan, form.approved_by)
+            else:
+                raise ValueError("请先选择 Agent V3 或手动规划模式")
+            from .history import atomic_json
+            atomic_json(approval_path(), record)
+            if runtime.planning_mode == "agent_v3":
+                graph_state = await agent_graph.approve(
+                    runtime.task_id, record["fingerprint"]
+                )
+        except (PermissionError, RuntimeError, ValueError, OSError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {
+            "approved": True,
+            "fingerprint": record["fingerprint"],
+            "agent_status": (graph_state or {}).get("status"),
+            "execution_mode": (record.get("execution_approval") or {}).get("mode", "MANUAL_LEGACY"),
+        }
+
+    @app.post("/api/agent/messages", status_code=status.HTTP_202_ACCEPTED)
+    async def agent_message(request: Request, form: AgentMessageRequest) -> dict[str, Any]:
+        if not runtime.can_control(request):
+            raise HTTPException(status_code=403, detail="远程页面为只读")
+        if not models.profile:
+            raise HTTPException(status_code=409, detail="请先分析 Fluent 模型")
+        if runtime.is_busy() or models.busy or control_lock.locked():
+            raise HTTPException(status_code=409, detail="当前任务正在扫描、提交或执行")
+        if planning_busy():
+            raise HTTPException(status_code=409, detail="当前任务已有一条 Agent 规划消息正在处理")
+        try:
+            if not agent_graph.configured:
+                raise RuntimeError(agent.reason or "大模型助手尚未配置")
+            async with agent_lock:
+                record = await submit_planning_attempt(form)
+        except (RuntimeError, ValueError, OSError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {
+            "accepted": True,
+            "attempt_id": record["attempt_id"],
+            "status": record["status"],
+            "deadline_at": record["deadline_at"],
+            "effective_reasoning": record["effective_reasoning"],
+        }
+
+    @app.get("/api/agent/attempts/{attempt_id}")
+    async def get_planning_attempt(attempt_id: str) -> dict[str, Any]:
+        record = attempt_store.get(attempt_id)
+        if record is None or record.get("task_id") != runtime.task_id:
+            raise HTTPException(status_code=404, detail="规划 attempt 不存在")
+        if record.get("status") in {"queued", "running", "cancelling"}:
+            graph_state = await agent_graph.get_state(runtime.task_id)
+            if graph_state:
+                record["current_node"] = graph_state.get("current_node")
+                record["graph_status"] = graph_state.get("status")
+        return record
+
+    @app.post("/api/agent/attempts/{attempt_id}/cancel")
+    async def cancel_planning_attempt(request: Request, attempt_id: str) -> dict[str, Any]:
+        if not runtime.can_control(request):
+            raise HTTPException(status_code=403, detail="远程页面为只读")
+        record = attempt_store.get(attempt_id)
+        if record is None or record.get("task_id") != runtime.task_id:
+            raise HTTPException(status_code=404, detail="规划 attempt 不存在")
+        running_task = attempt_store.tasks.get(attempt_id)
+        record = attempt_store.cancel(attempt_id)
+        if running_task is not None and not running_task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(running_task), timeout=2.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                pass
+        await agent_graph.set_terminal_state(
+            runtime.task_id,
+            status="cancelled",
+            message="本次规划已取消。",
+            error="local_cancellation",
+        )
+        return record
+
+    @app.post("/api/agent/attempts/{attempt_id}/retry", status_code=status.HTTP_202_ACCEPTED)
+    async def retry_planning_attempt(request: Request, attempt_id: str) -> dict[str, Any]:
+        if not runtime.can_control(request):
+            raise HTTPException(status_code=403, detail="远程页面为只读")
+        previous = attempt_store.get(attempt_id)
+        if previous is None or previous.get("task_id") != runtime.task_id:
+            raise HTTPException(status_code=404, detail="规划 attempt 不存在")
+        if previous.get("status") in {"queued", "running", "cancelling"}:
+            raise HTTPException(status_code=409, detail="当前 attempt 尚未结束")
+        if runtime.is_busy() or models.busy or control_lock.locked() or planning_busy():
+            raise HTTPException(status_code=409, detail="当前任务正在扫描、规划、提交或执行")
+        retry_form = AgentMessageRequest(
+            message=str(previous["message"]),
+            input_category="retry",
+            reasoning=previous.get("effective_reasoning"),
+        )
+        try:
+            async with agent_lock:
+                record = await submit_planning_attempt(retry_form)
+        except (RuntimeError, ValueError, OSError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {
+            "accepted": True,
+            "attempt_id": record["attempt_id"],
+            "status": record["status"],
+            "retry_of": attempt_id,
         }
 
     @app.post("/api/runs", status_code=status.HTTP_202_ACCEPTED)
@@ -708,14 +1322,117 @@ def create_app(
             )
         try:
             async with control_lock:
+                if planning_busy():
+                    raise RuntimeError("Agent 正在规划，不能启动旧状态")
+                if form.start_request_id and form.start_request_id in runtime.start_requests:
+                    prior = runtime.start_requests[form.start_request_id]
+                    return {
+                        "accepted": True,
+                        "status": prior.get("status", "running"),
+                        "mode": prior.get("mode"),
+                        "idempotent_replay": True,
+                    }
                 if runtime.is_busy():
                     raise RuntimeError("已有计算正在运行")
-                catalog = await models.validate_run(form)
-                spec = models.bind_connection(build_run_spec(spec_file, form, catalog))
+                plan = current_plan()
+                approval = _read_json(approval_path())
+                if approval is None:
+                    raise PermissionError("请先保存并确认 Objective / Gate 实验方案")
+                graph_state = await agent_graph.get_state(runtime.task_id)
+                is_v3_approval = bool(approval.get("payload", {}).get("agent_v3"))
+                if runtime.planning_mode == "agent_v3":
+                    if not form.start_request_id:
+                        raise PermissionError("V3 启动必须携带审批指纹作为幂等键")
+                    if not is_v3_approval:
+                        raise PermissionError("当前任务需要 V3 审批，禁止回退到手动方案")
+                    if not graph_state or not graph_state.get("resolved_task"):
+                        raise PermissionError("V3 ResolvedTaskObject 不存在")
+                    if graph_state.get("status") != "ready_to_run":
+                        raise PermissionError("V3 任务尚未完成审批或当前状态不可执行")
+                    if any(
+                        issue.get("status") == "open" and issue.get("severity") == "blocking"
+                        for issue in graph_state.get("active_issues", [])
+                    ):
+                        raise PermissionError("V3 任务仍存在阻断问题")
+                    assert_resolved_approval(
+                        models.profile,
+                        graph_state["resolved_task"],
+                        approval,
+                        v3_approval_context(graph_state),
+                    )
+                    resolved = graph_state["resolved_task"]
+                    task_object = resolved["task"]
+                    if form.case_file != models.profile["case_file"] or form.endpoint != models.profile["endpoint"]:
+                        raise ValueError("模型或 MCP 地址已改变，请重新规划")
+                    if form.target_trials != task_object["termination"]["max_trials"]:
+                        raise PermissionError("Trial 预算与已审批 V3 任务不一致")
+                    if form.iterations != task_object["solver_requirements"]["iterations"]:
+                        raise PermissionError("求解迭代数与已审批 V3 任务不一致")
+                    if await asyncio.to_thread(case_sha256, form.case_file) != models.profile["case_sha256"]:
+                        raise ValueError("Case SHA256 已变化，请重新分析和审批")
+                    registry = CapabilityRegistry(
+                        models.profile, models.catalog(), models.metrics()
+                    )
+                    experiment = compile_resolved_experiment(
+                        raw_spec,
+                        models.profile,
+                        resolved,
+                        registry,
+                        form.endpoint,
+                    )
+                    if not approval.get("execution_approval"):
+                        raise PermissionError("旧 V3 审批缺少完整执行契约，请重新审批")
+                    execution_approval = ExecutionApproval.model_validate(approval["execution_approval"])
+                    if execution_approval.approval_id != approval["fingerprint"]:
+                        raise PermissionError("完整执行契约与 V3 审批身份不一致")
+                    experiment = replace(experiment, execution_approval=execution_approval)
+                    require_execution_approval(experiment, registry)
+                    runtime.objective_direction = experiment.semantic_spec.objective.direction
+                    await runtime.start_resolved(experiment, registry, agent_graph)
+                    runtime.start_requests[form.start_request_id] = {
+                        "mode": "agent_v3",
+                        "status": "running",
+                        "started_at": _utc_now(),
+                    }
+                    runtime._persist_task_state()
+                    models.record_run(runtime.output_dir)
+                    defaults.update(form.model_dump())
+                    return {"accepted": True, "status": "running", "mode": "agent_v3"}
+                if runtime.planning_mode != "manual":
+                    raise PermissionError("请先选择并审批一种规划模式")
+                if is_v3_approval:
+                    raise PermissionError("当前任务是手动模式，禁止使用 V3 审批记录")
+                if plan is None:
+                    raise PermissionError("实验方案不存在")
+                if not form.parameters:
+                    raise ValueError("手动模式至少需要一个优化参数")
+                submitted = json.loads(json.dumps(plan))
+                submitted["parameters"] = [item.model_dump() for item in form.parameters]
+                submitted["budget"] = {
+                    "target_trials": form.target_trials,
+                    "iterations": form.iterations,
+                }
+                submitted = normalize_plan(
+                    submitted, models.catalog(), models.metrics()
+                )
+                if submitted != plan:
+                    raise PermissionError(
+                        "提交内容与已审批方案不一致，请重新保存并确认"
+                    )
+                catalog = await models.validate_approved_run(form, plan, approval)
+                spec = compile_experiment_spec(
+                    raw_spec,
+                    models.profile,
+                    plan,
+                    catalog,
+                    models.metrics(),
+                    form.endpoint,
+                )
                 models.save_ranges(form.parameters, runtime.output_dir)
+                runtime.objective_direction = spec.objective.direction
                 await runtime.start(spec, form.target_trials)
                 models.record_run(runtime.output_dir)
-        except (SpecError, RuntimeError, ValueError) as exc:
+        except (SpecError, PermissionError, RuntimeError, ValueError) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         defaults.update(form.model_dump())
         return {"accepted": True, "status": "running"}
@@ -731,6 +1448,8 @@ def create_app(
             )
         try:
             async with control_lock:
+                if planning_busy():
+                    raise RuntimeError("Agent 正在规划，不能启动单点计算")
                 if runtime.is_busy():
                     raise RuntimeError("已有计算正在运行")
                 catalog = await models.validate_run(form)
@@ -753,7 +1472,17 @@ def create_app(
     async def reset_agent_conversation(request: Request) -> dict[str, Any]:
         if not runtime.can_control(request):
             raise HTTPException(status_code=403, detail="远程页面为只读")
+        if planning_busy() or control_lock.locked() or runtime.is_busy():
+            raise HTTPException(status_code=409, detail="当前任务正在规划、提交或执行")
         revision = runtime.clear_conversation()
+        if models.profile:
+            await agent_graph.reset(
+                task_id=runtime.task_id,
+                conversation_revision=revision,
+                model_id=models.profile["model_id"],
+                case_sha256=models.profile["case_sha256"],
+                model_signature_sha256=models.profile["signature_sha256"],
+            )
         return {"cleared": True, "conversation_revision": revision}
 
     @app.post("/api/tasks/new", status_code=status.HTTP_201_CREATED)
@@ -761,8 +1490,8 @@ def create_app(
         if not runtime.can_control(request):
             raise HTTPException(status_code=403, detail="远程页面为只读")
         try:
-            if models.busy or control_lock.locked():
-                raise RuntimeError("模型扫描或提交正在进行")
+            if models.busy or control_lock.locked() or planning_busy():
+                raise RuntimeError("模型扫描、Agent 规划或提交正在进行")
             task_record = runtime.new_task()
             models.profile = None
         except RuntimeError as exc:
@@ -771,6 +1500,105 @@ def create_app(
         defaults.update(initial_defaults)
         models.apply_defaults(defaults)
         return {"created": True, "task": task_record}
+
+    @app.get("/api/agent/state")
+    async def get_agent_state() -> dict[str, Any]:
+        state_value = await agent_graph.get_state(runtime.task_id)
+        return {"agent": agent_graph.state_info(), "state": state_value}
+
+    @app.get("/api/tasks/current/plan")
+    async def get_current_agent_plan() -> dict[str, Any]:
+        state_value = await agent_graph.get_state(runtime.task_id)
+        return {"task_object": (state_value or {}).get("task_object")}
+
+    @app.get("/api/tasks/current/resolved-task")
+    async def get_current_resolved_task() -> dict[str, Any]:
+        state_value = await agent_graph.get_state(runtime.task_id)
+        return {"resolved_task": (state_value or {}).get("resolved_task")}
+
+    @app.get("/api/tasks/current/geometry-recommendation")
+    async def get_current_geometry_recommendation() -> dict[str, Any]:
+        state_value = await agent_graph.get_state(runtime.task_id)
+        return {"geometry_recommendations": (state_value or {}).get("geometry_recommendations", [])}
+
+    @app.get("/api/tasks/current/geometry-verification-request")
+    async def get_current_geometry_verification_request() -> dict[str, Any]:
+        return {"request": _read_json(runtime.output_dir / "geometry_verification_request.json")}
+
+    @app.get("/api/tasks/current/autonomy-report")
+    async def get_current_autonomy_report() -> dict[str, Any]:
+        state_value = await agent_graph.get_state(runtime.task_id) or {}
+        audit_events: list[dict[str, Any]] = []
+        audit_dir = runtime.output_dir / "planning_audit"
+        for path in sorted(audit_dir.glob("*.jsonl")):
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(event, dict):
+                    audit_events.append(event)
+        inputs = list(state_value.get("input_history", []))
+        user_message_count = sum(
+            1 for item in state_value.get("messages", []) if item.get("role") == "user"
+        )
+        uncategorized_user_inputs = max(0, user_message_count - len(inputs))
+        intervention_coverage_complete = uncategorized_user_inputs == 0
+        category_counts = {
+            category: sum(1 for item in inputs if item.get("category") == category)
+            for category in {
+                "initial_request", "physical_clarification", "plan_revision",
+                "technical_repair", "retry", "user_message",
+            }
+        }
+        resolved = state_value.get("resolved_task") or {}
+        classifications = [
+            item.get("binding", {}).get("classification")
+            for item in resolved.get("variables", [])
+        ]
+        trials = _trial_documents(runtime.output_dir)
+        verification = _read_json(runtime.output_dir / "verification" / "result.json")
+        approval = _read_json(approval_path())
+        planning_attempts = [
+            record for record in attempt_store.records.values()
+            if record.get("task_id") == runtime.task_id
+        ]
+        model_audit_coverage_complete = bool(planning_attempts) or not state_value.get("messages")
+        return {
+            "task_id": runtime.task_id,
+            "planning_mode": runtime.planning_mode,
+            "plan_revision": state_value.get("plan_revision", 0),
+            "planning_attempts": planning_attempts,
+            "model_calls": {
+                "coverage_complete": model_audit_coverage_complete,
+                "recorded": len(audit_events),
+                "completed": sum(1 for item in audit_events if item.get("outcome") == "completed"),
+                "failed_or_timed_out": sum(1 for item in audit_events if item.get("outcome") in {"failed", "timed_out"}),
+                "network_retries": sum(int(item.get("network_retry_count", 0)) for item in audit_events),
+                "provider_request_ids_available": sum(1 for item in audit_events if item.get("provider_request_id")),
+                "token_usage_available": sum(1 for item in audit_events if item.get("token_usage") is not None),
+                "evidence_path": str(audit_dir),
+            },
+            "human_intervention": {
+                "coverage_complete": intervention_coverage_complete,
+                "uncategorized_user_inputs": uncategorized_user_inputs,
+                "category_counts": category_counts,
+                "physical_clarifications": category_counts["physical_clarification"],
+                "technical_hints": category_counts["technical_repair"],
+                "recorded_manual_contract_edits": 0,
+                "approved": bool(approval),
+                "note": None if intervention_coverage_complete else (
+                    "该任务早于结构化干预审计；零计数不能解释为没有人工技术提示"
+                ),
+            },
+            "execution": {
+                "trial_records": len(trials),
+                "fluent_execution_recorded": bool(trials),
+                "independent_verification_recorded": bool(verification),
+                "result_class": "proxy" if "MAPPED_PROXY" in classifications else "direct" if classifications else None,
+                "geometry_verification_recorded": bool(_read_json(runtime.output_dir / "geometry_verification_result.json")),
+            },
+        }
 
     @app.get(
         "/api/direct-runs/{run_id}/temperature-contour.png",
@@ -795,6 +1623,11 @@ def create_app(
 
 
 def main() -> None:
+    # Load developer-local credentials without overriding explicitly supplied
+    # process environment variables.  The repository .gitignore excludes .env.
+    from dotenv import load_dotenv
+
+    load_dotenv(PROJECT_ROOT / ".env", override=False)
     parser = argparse.ArgumentParser(description="Serve the Vegapunk Fluent Lab UI")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8780)

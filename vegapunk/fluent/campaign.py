@@ -50,6 +50,9 @@ def campaign_payload(spec: ExperimentSpec) -> dict[str, Any]:
     endpoint = connection.pop("endpoint", None)
     del endpoint
     connection.pop("client_timeout_seconds", None)
+    connection.pop("tool_timeout_seconds", None)
+    connection.pop("connect_timeout_seconds", None)
+    connection.pop("solve_timeout_seconds", None)
     connection.pop("job_endpoint", None)
     baseline_sha256 = connection.pop("baseline_sha256", None)
     connection.pop("allow_remote_endpoint", None)
@@ -71,6 +74,7 @@ def campaign_payload(spec: ExperimentSpec) -> dict[str, Any]:
         "objective": raw["objective"],
         "constraints": raw["constraints"],
         "optimization": optimization,
+        "execution_contract": raw.get("execution_contract"),
         "gate_version": GATE_VERSION,
         "optuna_version": _package_version("optuna"),
     }

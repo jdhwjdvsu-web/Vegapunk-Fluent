@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .model_introspection import SCANNER_VERSION, scan_model
 from .model_profile import MAX_PARAMETERS, PROFILE_SCHEMA
+from .metric_catalog import METRIC_VERSION, resolve_metrics
 from .parameter_ranker import rank_parameters
 from .parameter_rules import RULE_VERSION, resolve_parameters
 from .profile_store import ProfileStore, case_sha256, profile_key
@@ -32,6 +33,11 @@ class AdaptiveModels:
                                   recommended_max=overrides[item.key][1])
                 if item.key in overrides else item for item in candidates}
 
+    def metrics(self) -> dict:
+        if not self.profile:
+            return {}
+        return {item.key: item for item in resolve_metrics(self.profile["signature"])}
+
     def state(self) -> dict:
         profile = self.profile
         return {
@@ -39,7 +45,7 @@ class AdaptiveModels:
             "max_parameters": MAX_PARAMETERS,
             "profile": profile,
             "execution_ready": bool(profile and profile.get("contract_confirmed")),
-            "notice": "扫描只做参数发现；建议范围需人工确认。新模型的 Objective / Gate 尚待适配。",
+            "notice": "参数与指标来自模型扫描；新模型仍需通过服务端方案审批后才能执行。",
         }
 
     def persist_selection(self, output: Path) -> None:
@@ -55,6 +61,7 @@ class AdaptiveModels:
         try:
             profile = json.loads(path.read_text(encoding="utf-8"))
             if (profile and profile.get("rule_version") == RULE_VERSION
+                    and profile.get("metric_version") == METRIC_VERSION
                     and profile.get("scanner_version") == SCANNER_VERSION
                     and case_sha256(profile["case_file"]) == profile["case_sha256"]):
                 self.profile = profile
@@ -73,6 +80,8 @@ class AdaptiveModels:
             previous = self.store.get(model_id)
             # No version pin -> no reuse: an upgraded default Fluent must be rescanned.
             profile = self.store.get(model_id) if product_version and not force else None
+            if profile and profile.get("metric_version") != METRIC_VERSION:
+                profile = None
             cached = profile is not None
             if not profile:
                 kwargs = dict(self.template["connection"]["connect_kwargs"])
@@ -94,6 +103,7 @@ class AdaptiveModels:
                 profile = {
                     "schema_version": PROFILE_SCHEMA, "model_id": model_id,
                     "case_sha256": digest, "rule_version": RULE_VERSION,
+                    "metric_version": METRIC_VERSION,
                     "scanner_version": SCANNER_VERSION,
                     "fluent_version": signature["fluent_version"], "product_version": product_version,
                     "dimension": dimension, "endpoint": endpoint, "signature": signature,
@@ -123,6 +133,9 @@ class AdaptiveModels:
                 profile["selected_parameters"] = previous.get("selected_parameters", [])
                 profile["history"] = previous.get("history", [])
             profile["parameter_candidates"] = [asdict(item) for item in candidates]
+            profile["metric_candidates"] = [
+                asdict(item) for item in resolve_metrics(profile["signature"])
+            ]
             profile["ranking"] = rank_parameters(candidates, question)
             profile["recommended_parameters"] = [item["key"] for item in profile["ranking"][:2]]
             profile["research_question"] = question
@@ -167,6 +180,31 @@ class AdaptiveModels:
             else:
                 parameter.validate_display_value(item.range_min, "参数下限")
                 parameter.validate_display_value(item.range_max, "参数上限")
+        return catalog
+
+    async def validate_approved_run(self, form, plan: dict, approval: dict) -> dict:
+        """Validate a new-model run only through a fingerprint-bound approval."""
+        from .planning import assert_approval
+
+        if self.busy:
+            raise RuntimeError("请等待模型扫描完成")
+        if (
+            not self.profile
+            or form.case_file != self.profile["case_file"]
+            or form.endpoint != self.profile["endpoint"]
+        ):
+            raise ValueError("模型或 MCP 地址已改变，请先分析模型")
+        if await asyncio.to_thread(case_sha256, form.case_file) != self.profile["case_sha256"]:
+            self.profile = None
+            raise ValueError("模型已变化，需要重新分析参数")
+        assert_approval(self.profile, plan, approval)
+        catalog = self.catalog()
+        for item in form.parameters:
+            if item.parameter_key not in catalog:
+                raise ValueError("参数不属于当前模型的可编辑目录")
+            parameter = catalog[item.parameter_key]
+            parameter.validate_display_value(item.range_min, "参数下限")
+            parameter.validate_display_value(item.range_max, "参数上限")
         return catalog
 
     def save_ranges(self, parameters: list, output: Path) -> None:

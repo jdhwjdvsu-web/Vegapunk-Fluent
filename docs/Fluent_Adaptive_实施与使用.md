@@ -1,6 +1,6 @@
-# Fluent Adaptive：参数自动适配第一版
+# Fluent Adaptive：参数自动适配第一版（历史记录）
 
-更新：2026-09-07。改造目录仅为 `D:\Vegapunk-Fluent`，不修改 `D:\Vegapunk`。
+更新：2026-09-07。本页是第一阶段历史记录，当前实施说明见 `Fluent_Adaptive_V2_实施与使用.md`。
 
 ## 本轮交付边界
 
